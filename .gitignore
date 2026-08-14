@@ -1,0 +1,10 @@
+# never commit a filled-in config - ApiKey lives in these
+**/BepInEx/config/*.cfg.local
+
+# build intermediates
+AI2UCustomAI_new.dll
+*.bak-*
+
+# game saves must never land here
+*.yags
+steam_autocloud.vdf

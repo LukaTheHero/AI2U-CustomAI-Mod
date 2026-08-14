@@ -1,0 +1,106 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1920px;height:1080px;overflow:hidden}
+  body{position:relative;font-family:Georgia,'Book Antiqua',serif;
+    background:
+      radial-gradient(900px 520px at 85% 8%, rgba(226,164,214,.26), transparent 68%),
+      radial-gradient(760px 460px at 10% 92%, rgba(150,208,226,.20), transparent 70%),
+      linear-gradient(160deg,#211936 0%,#2a1f4c 40%,#352a60 74%,#241b42 100%);
+  }
+  #stars{position:absolute;inset:0}
+  .s{position:absolute;background:#fff;border-radius:50%}
+  .wrap{position:relative;height:1080px;padding:68px 88px 62px;
+    display:flex;flex-direction:column;justify-content:space-between}
+  .kicker{font-family:'Segoe UI',sans-serif;font-size:17px;letter-spacing:.36em;
+    text-transform:uppercase;color:#c9b6e8;margin-bottom:16px}
+  h1{font-size:82px;color:#fff;letter-spacing:-.5px;line-height:1;
+    text-shadow:0 3px 30px rgba(232,165,200,.5),0 2px 4px rgba(0,0,0,.5)}
+  h1 .pink{color:#f2b8da}
+  .sub{margin-top:18px;font-size:29px;font-style:italic;color:#e6d9f7}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}
+  .card{background:linear-gradient(150deg,rgba(255,255,255,.10),rgba(255,255,255,.045));
+    border:1px solid rgba(242,184,218,.30);border-radius:20px;padding:38px 38px}
+  .card h2{font-size:33px;color:#f7dcee;margin-bottom:14px;letter-spacing:.2px}
+  .card p{font-family:'Segoe UI',sans-serif;font-size:20.5px;line-height:1.55;color:#ddd0f0}
+  .card .bad{color:#ffb9b9}
+  .card .good{color:#a8e6a8;font-weight:600}
+  .foot{display:flex;align-items:stretch;gap:32px}
+  .use{flex:1.35;background:rgba(242,184,218,.12);border:1px solid rgba(242,184,218,.42);
+    border-radius:20px;padding:32px 38px}
+  .use h3{font-size:24px;color:#f2b8da;margin-bottom:12px;font-family:'Segoe UI',sans-serif;
+    letter-spacing:.16em;text-transform:uppercase}
+  .use p{font-family:'Segoe UI',sans-serif;font-size:20px;line-height:1.55;color:#efe4fb}
+  .use code{font-family:Consolas,monospace;font-size:19px;color:#fff}
+  .ver{flex:.65;background:rgba(255,255,255,.07);border:1px solid rgba(169,212,232,.34);
+    border-radius:20px;padding:26px 30px;display:flex;flex-direction:column;justify-content:center;
+    font-family:'Segoe UI',sans-serif}
+  .ver b{font-size:30px;color:#a9d4e8;letter-spacing:.04em}
+  .ver span{font-size:17.5px;color:#c2b2df;margin-top:8px;line-height:1.45}
+  .glow{position:absolute;left:0;right:0;bottom:0;height:4px;
+    background:linear-gradient(90deg,transparent,#f2b8da,#a9d4e8,transparent);opacity:.9}
+</style>
+<div id="stars"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="kicker">BepInEx plugin &nbsp;·&nbsp; AI2U — With you til the end</div>
+    <h1>Custom <span class="pink">AI Endpoint</span></h1>
+    <div class="sub">Your own AI. Your own model. Your own voice.</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>You choose the model</h2>
+      <p>The game's built-in “personal key” option never calls OpenAI — it forwards
+      your key to the AI2U server, which still picks the model. This routes dialogue
+      to <b>any</b> OpenAI-compatible endpoint instead.</p>
+    </div>
+    <div class="card">
+      <h2>She stops forgetting</h2>
+      <p>Stock memory is trimmed to <span class="bad">3,072 tokens</span>, silently
+      deleting her oldest messages. Raised here to
+      <span class="good">500,000</span> — the whole conversation stays intact.</p>
+    </div>
+    <div class="card">
+      <h2>She stops ignoring you</h2>
+      <p>If the model invents an action name, the engine discards it without a word —
+      she agrees to follow you, then stands still. Valid actions are read from the
+      <b>live game</b> and enforced as a whitelist.</p>
+    </div>
+    <div class="card">
+      <h2>Set up in-game</h2>
+      <p>URL, key, model and voice all live in <b>Settings → AI Setup</b>, with
+      <span class="good">Test</span> buttons that go green when it works. No config
+      file editing required.</p>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="use">
+      <h3>What the author runs</h3>
+      <p>Text — OpenRouter, <code>google/gemini-3.6-flash</code><br>
+      Voice — xAI Grok TTS, voice <code>iris</code>. ElevenLabs sounds better and costs more.</p>
+    </div>
+    <div class="ver">
+      <b>GAME v0.1.46</b>
+      <span>Unity 2022.3.62 · Mono · x64<br>Report it if an update breaks this.</span>
+    </div>
+  </div>
+</div>
+<div class="glow"></div>
+<script>
+  let s=192837465;
+  const rnd=()=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff};
+  const box=document.getElementById('stars');
+  for(let i=0;i<300;i++){
+    const d=document.createElement('div');d.className='s';
+    const sz=rnd()*2.3+0.5;
+    d.style.width=d.style.height=sz.toFixed(2)+'px';
+    d.style.left=(rnd()*100).toFixed(2)+'%';
+    d.style.top=(rnd()*100).toFixed(2)+'%';
+    d.style.opacity=(0.16+rnd()*0.7).toFixed(2);
+    if(sz>2.2)d.style.boxShadow='0 0 7px 1px rgba(255,255,255,.65)';
+    box.appendChild(d);
+  }
+</script>

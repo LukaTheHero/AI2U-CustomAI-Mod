@@ -54,3 +54,4 @@ MIT for everything in this repository (see LICENSE). The game itself, its conten
 and its trademarks belong to AlterStaff — this project is unofficial and
 unaffiliated. Out of respect for the developers, the mod refuses to use their
 metered servers with modified prompts: your own API key only.
+!!!YOU ARE NOT ALLOWED TO MODIFY THIS MOD MALICIOUSLY TO USE THEIR SERVERS, I WILL REPORT YOU TO ALTERSTAFF.!!!

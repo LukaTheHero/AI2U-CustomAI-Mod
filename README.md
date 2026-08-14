@@ -55,4 +55,23 @@ and its trademarks belong to AlterStaff — this project is unofficial and
 unaffiliated. Out of respect for the developers, the mod refuses to use their
 metered servers with modified prompts: your own API key only.
 
-!!!YOU ARE NOT ALLOWED TO MODIFY THIS MOD MALICIOUSLY TO USE THEIR SERVERS, I WILL REPORT YOU TO ALTERSTAFF.!!!
+## ⛔ The one hard line
+
+> **Do not point any fork of this code at AlterStaff's servers. Ever.**
+>
+> Every AI request their servers process costs them real money. This mod exists
+> on one founding rule: **your own API key, your own bill.** The dialogue
+> interception, the guard patches, the endpoint routing — all of it is built to
+> keep modded traffic *off* their infrastructure, and that restraint is the only
+> reason a mod like this can exist in good conscience.
+>
+> If you strip those guards out and free-ride modified prompts through their
+> paid endpoints, you are not modding — you are stealing compute from a small
+> team, on my code, with my name upstream of it. **I will find out, I will
+> report you to AlterStaff with everything I have, and I will help them shut
+> you down.** Forks that cross this line get DMCA'd without a warning shot.
+>
+> Fork anything else. Custom characters, new endpoints, wild experiments — go
+> nuts, that's why this is public. But the developers made something worth
+> modding, and nobody gets to make them pay for our fun.
+

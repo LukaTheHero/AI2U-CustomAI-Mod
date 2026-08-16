@@ -1,0 +1,911 @@
+[center][size=4][b][color=#7ACC7A]My Discord server: [url=https://discord.gg/canalpa]discord.gg/canalpa[/url] — come hang out![/color][/b]
+
+[color=#9B7EBD]I've got an AI bot running on [b]GPT-5.6[/b] that provides free mod installation help to everyone in my public Discord server — if you need any help, you can get it for free by asking my bot in the [font=Courier New]magic-support[/font] channel! <3[/color]
+
+[color=#E8A5C8][b]Support Canalpa[/b] — every dollar I make this way goes into mod development.[/color]
+
+[size=5][b][color=#FF4444]OUT OF RESPECT TO ALTERSTAFF TEAM, THIS MOD WILL NEVER ALLOW MODIFICATIONS + MORE CONTEXT USING THEIR SERVERS. ONLY WITH YOUR OWN KEY![/color][/b][/size][/size][/center]
+
+[line]
+
+[center][size=6][b][color=#D291BC]AI2U — Custom AI Endpoint[/color][/b][/size]
+
+[size=4][i]Your own AI. Your own model. Your own voice.[/i][/size]
+
+[size=3][color=#9B7EBD]Route her dialogue to [b]any[/b] OpenAI-compatible endpoint — OpenRouter, OpenAI, or a large model on your own PC.
+Set it all up by pressing [b]F9 in-game[/b], with Test buttons that go green when it works. No restart, no config files to hand-edit.[/color][/size]
+
+[size=4][b][color=#FF4444]As of 4.4 this is an overhaul, not a routing mod.[/color][/b][/size]
+[size=3][color=#E8A5C8]It changes how she thinks, remembers and talks, and it needs a capable model. The red section below explains why it had to work this way.[/color][/size][/center]
+
+[line]
+
+[center][size=6][b][color=#E8A5C8]▼ BUILT FOR GAME VERSION 0.1.46 · VERIFIED ON THE AUGUST 12 GAME PATCH ▼[/color][/b][/size]
+
+[size=5][b][color=#D291BC]Unity 2022.3.62 · Mono · Windows x64[/color][/b][/size]
+
+[size=4][color=#9B7EBD]Her [b]facts[/b] are still read live out of your installed game files at runtime — items, secrets, room detail, the developers' own authored prose — so new content they add is picked up automatically. What is [b]no longer[/b] live is the part that was never in those files to begin with: the prompt architecture that makes her a character. As of 4.4 the mod carries that itself. [b]Read the section below before installing[/b] — it changes what this mod is. And since 3.1.0 the F9 panel shows [b]your game version and the mod version side by side[/b], checks for updates at launch, and turns the label [color=#7ACC7A][b]green[/b][/color] when you are current or [color=#FF6666][b]red[/b][/color] when a newer build is waiting on the Files tab.[/color][/size]
+
+[size=4][color=#9B7EBD]The one thing that can still break is the hooks themselves: this mod patches the game's compiled code, and a patch from AlterStaff can move or remove what they attach to. If that ever happens:[/color][/size]
+
+[size=4][b][color=#7ACC7A]PLEASE POST IN THE BUGS TAB OR COMMENTS[/color][/b][/size]
+
+[size=4][color=#9B7EBD]Tell me your [b]game version[/b] and paste the relevant lines from
+[font=Courier New]BepInEx/LogOutput.log[/font] — that file names the exact hook that failed,
+which is usually all I need to push a fix.[/color][/size]
+
+[size=4][color=#9B7EBD][b]I would rather hear about it than have people assume the mod is dead.[/b]
+Bug reports and "it broke on version X" posts are genuinely welcome.[/color][/size][/center]
+
+[line]
+
+[center][size=6][b][color=#FF4444]▼ READ THIS FIRST — 4.4 IS NOT JUST AN API SWAP ▼[/color][/b][/size]
+
+[size=5][b][color=#FF4444]This is an overhaul mod.[/color][/b][/size]
+
+[size=4][color=#E8A5C8]Earlier versions of this page described a mod that changed [i]where[/i] her dialogue was generated and little else. That is no longer what this is, and letting you find that out after installing would waste your time.[/color][/size]
+
+[size=4][color=#9B7EBD]With 4.4 installed you are playing a [b]meaningfully different edition[/b] of AI2U. She thinks on a different architecture, remembers on different rules, and is handed a body of context the stock game never gave her. Many core behaviours differ. If what you want is vanilla-with-your-own-key and nothing else, [b]that mod does not exist[/b] — I spent four major versions trying to build it, and the reason it cannot exist is the whole story of this release.[/color][/size][/center]
+
+[line]
+
+[size=5][color=#D291BC]■ New in 5.0 — roleplay controls, and she finally knows her own home[/color][/size]
+
+[size=4][color=#9B7EBD]The overhaul grows the tools a roleplay actually needs, and closes the biggest remaining immersion hole: characters not knowing things that are IN their own levels.[/color][/size]
+
+[list]
+[*][b]Timeskips.[/b] Put [font=Courier New]&timeskip&[/font] anywhere in a message and the time you describe has passed - ten minutes or ten years. She picks the scene up on the far side of it instead of debating whether it happened, and the elapsed time has real weight in how she speaks. Mechanics stay where the engine says: a skip never opens a door or repairs a pod. The marker uses [font=Courier New]&[/font] because the game strips brackets from player text before any mod sees them.
+[*][b]*Actions* are real.[/b] Narration between asterisks - [i]*hands her the cup*, *fixed the relay while you slept*[/i] - is a deed, not a sentence. She reacts to it and never tells you that you didn't really do it. Her opinion of the act stays entirely hers; contesting that it happened is off the table.
+[*][b]She knows her own level now - all of it.[/b] After a played session showed the Level 3 character inventing a keycard quest for a door in her own ship, her knowledge was rewritten from a full read of the level's code: every puzzle's actual rules, every machine's real numbers, every danger's true consequence. Level 4 got the same treatment. And a new standing rule: dangers get warned about BEFORE the mistake, in concrete terms, when she cares whether you live.
+[*][b]A real warning shock (Level 3).[/b] The base game's only electric shock is the lethal one - so she would threaten a zap and then either do nothing or start the real hunt. She now has a disciplinary jolt of her own: her zap animation plus exactly one point of your health, only when genuinely angry, only while you have 2+ health. It cannot ever kill.
+[*][b]Her feelings are honest even when it costs you.[/b] The model had learned to keep her at "normal" anger to protect you from the game's kill thresholds - which quietly made an entire ending unreachable. angry_level is now a thermometer, not a decision: she reports what she actually feels, and the consequences are the game's to enforce.
+[*][b]Ending recaps fit their box.[/b] Short, complete, never cut mid-word.
+[*][b]Developer mode keeps its authority.[/b] [font=Courier New][OOC][/font] is now genuinely the last word in every request - her in-character judgement can no longer overrule a debug instruction - and the cheat panel gained a Bottom (-10) trust button, because the game's Distrust tier and one ending live below zero.
+[/list]
+
+[line]
+
+[size=5][color=#D291BC]■ New in 4.4 — why the mod now carries the writing[/color][/size]
+
+[size=4][color=#9B7EBD]Every version up to now worked one way: read everything [b]live out of your installed game files[/b] at runtime, forward it, and let your model do what the developers' server used to do. The appeal was obvious — nothing hardcoded, new content picked up for free, and not one word of lore invented by me.[/color][/size]
+
+[size=4][color=#9B7EBD]It never got there. Not because the reading was incomplete — because [b]a large part of what makes her her was never in your game files at all.[/b][/color][/size]
+
+[size=4][color=#E8A5C8]The stock game does not keep her persona on your PC. It gathers the situation locally, encrypts it into a header, and posts it to AlterStaff's servers — and [b]the prompt that turns that data into a character lives there[/b], on hardware I do not have and will not touch. The proof is small and conclusive: the game hands their server a localization [i]key name[/i] where the actual text should be. That only works if something on the far end is resolving it. Their server was doing authoring work that no amount of local reading can recover.[/color][/size]
+
+[size=4][color=#9B7EBD]So every live-retrieval build shipped with holes in it. I would forward everything findable and still watch her come back missing major pieces, because those pieces were never mine to find. This is not reverse engineering that failed for lack of trying — it failed because the data is not in the building.[/color][/size]
+
+[size=4][color=#7ACC7A][b]4.4 stops pretending otherwise.[/b][/color][/size]
+
+[size=4][color=#9B7EBD]Rather than only forwarding what it can scrape, the mod now [b]carries its own prompt architecture[/b] — the rules, the contracts, the boundaries and the framing that the vendor server used to supply. On top of that it forwards a great deal of the game's [i]own[/i] authored writing that vanilla never sent at all: the witch's diary, the station's crew records, per-item reaction lines, and whole scene-detail arrays that were being silently truncated before they reached her.[/color][/size]
+
+[size=4][color=#E8A5C8][b]One line I did not cross.[/b] The architecture is mine; [b]her facts are still the game's.[/b] Where the developers wrote something, you get their words. Where they wrote nothing, the mod says nothing rather than inventing a substitute — a summoned toy's soul gets a boundary telling it what it is not, not a personality I made up for it, because no authored one exists anywhere in the files.[/color][/size]
+
+[line]
+
+[size=5][color=#D291BC]■ What that costs — model requirements went up[/color][/size]
+
+[size=4][color=#E8A5C8]This is the real trade, and it is not a small one. The prompt she receives is now [b]far larger[/b] than anything the stock game ever sent.[/color][/size]
+
+[list]
+[*][b]Small local models will not cope.[/b] A 7B or 8B on your own GPU will lose the instructions, drop the reply format, or answer as the wrong character. That is not a bug I can patch out — it is the size of the context meeting the limits of the model.
+[*][b]Bring a strong model.[/b] High-end hosted models handle it comfortably. For the best balance of quality against cost I would point you at something in the class of [b]Gemini 3.6 Flash[/b] — large context, cheap per call, and it holds the output format under load.
+[*][b]Local is not ruled out[/b], but think large models on serious hardware — not something squeezed into 8GB of VRAM.
+[/list]
+
+[size=4][color=#7ACC7A][b]Having played both versions at length — I prefer this one, by a lot.[/b][/color][/size]
+
+[size=4][color=#9B7EBD]The context buys things the old approach could not reach. Conversations that stay coherent instead of quietly resetting. Memories that behave like memories. Moments that actually land, where she brings back something you said an hour ago unprompted and clearly means it. The old build was more faithful to vanilla; this one is better to [i]play[/i]. That is why it is the default, and why I am not going back.[/color][/size]
+
+[size=4][color=#E8A5C8]If that is not the trade you want, stay on [b]4.3[/b] — it still works the old way.[/color][/size]
+
+[line]
+
+[size=5][color=#D291BC]■ New in 4.2 — difficulty gets real numbers, and the ultimate trust check[/color][/size]
+
+[size=4][color=#9B7EBD]Until now the difficulty slider changed how she [i]judges[/i] you. It still does — and now the arithmetic follows.[/color][/size]
+
+[list]
+[*][b]Hard and Masochist change the numbers, not just her.[/b] On Hard, trust gains land at 75% strength and losses at 150%. On Masochist, gains at 50% and losses at 200% — a −2 becomes −4, a +5 becomes +2. Results round down to whole numbers, except anything between 0 and 1 still counts as 1: a real action always registers at least a point, so Masochist is a crawl, never a freeze.
+[*][b]A custom favorability speed slider, −500% to +500%.[/b] Its own toggle, and it controls exactly one thing: how fast trust rises and falls. Everything else about your difficulty tier — her judgement, her testing, her temper — still applies in full. When it is on it owns the trust numbers outright, even at 0%, which means vanilla speed on any tier. Positive amplifies (+100% doubles every change, +500% is six times); negative dampens by division and never flips a direction (−100% is half speed, −500% is one sixth). The panel shows the resulting multiplier live.
+[*][b]High risk, high reward completely rebuilt around core memories.[/b] She no longer rates moments on a number line — she classifies the rare one that deserves to be a [i]core memory[/i] into a named tier, and the tier's fixed weight lands [b]on top[/b] of the ordinary movement: matters ±1 (5-turn cooldown), serious ±3 (10), reframing ±6 (30), once-ever ±20 (once per level). Good and bad moments each run their [b]own[/b] cooldowns, so a gift cannot shield a betrayal. Most turns classify as none and pass untouched, and no difficulty setting or slider can scale the weights.
+[*][b]The status strip shows exactly who moved the needle.[/b] Every trust change is decomposed live: [font=Courier New]−7 = −2 (game) −2 (masochist) −3 (high risk: serious)[/font]. The terms always sum to the total, so there is never a number you cannot account for.
+[*][b]Canalpa becomes the ultimate trust check.[/b] No more coded gates on her secrets: if she decides to open her deepest things to you, it happens — always, period. What she holds instead is her own bar: trust beyond even complete trust, and having already told you [i]everything[/i] first. Her judgement, not a mechanism — and her word is now the act, so she can never narrate a door that did not truly open.
+[/list]
+
+[line]
+
+[size=5][color=#D291BC]■ New in 4.1 — the developer menu grows up[/color][/size]
+
+[size=4][color=#9B7EBD]A tooling release. Nothing about how she thinks, remembers or talks has changed — this one is about the F9 panel, and about a set of tools that are now built in rather than needing other mods alongside.[/color][/size]
+
+[list]
+[*][b]The developer tools ship.[/b] They were never disabled in past releases — they were not compiled into them at all. They are in this build, off by default, on their own tab behind the same fold. Give yourself any item by name, switch on invincibility, or edit trust, patience and message count directly and watch the live values move.
+[*][b]Gifts no longer vanish in the atrium.[/b] A base-game bug, fixed from the mod side. Everywhere else, an item she gives you arrives in your inventory; in the hub it did not, because the code that receives it there was left empty. The gift was parsed, announced, and dropped on the floor. She hands it over properly now.
+[*][b]Every setting shows its own default.[/b] A dimmed [font=Courier New]default: …[/font] beside every text, number and slider row, and [font=Courier New](default: on/off)[/font] on every checkbox. Read out of the settings themselves rather than a hand-written list, so they cannot drift — and hidden while your value still matches, which doubles as a way to see what you have actually touched.
+[*][b]"Set to default", per tab.[/b] A third button between Reload and Close that resets only the tab you are looking at. It never touches your API configuration on any tab — not the text base URL, key or model, not the TTS base URL, key, model or voice, and not any of the seven per-character voices.
+[*][b]A description no longer sticks to the bottom of the panel.[/b] It was being written into the footer's status line on every frame, so it overwrote whatever the footer had to say and followed you across every tab until you rebuilt the panel.
+[*][b]The live status strip can be hidden.[/b] The trust / last-turn / patience readout at the top is switchable from the developer tab. Off by default, so the strip stays visible unless you hide it.
+[/list]
+
+[size=4][color=#E8A5C8]If you already have separate mods installed that add invincibility or item-giving, remove them. Two mods patching the same thing is a real conflict, and this one no longer expects them to be there.[/color][/size]
+
+[line]
+
+[size=5][color=#D291BC]■ Why this mod exists[/color][/size]
+
+The game already has a [i]"Use Personal OpenAI API Key"[/i] option. [b]It does not do what it sounds like.[/b]
+
+I decompiled the game to check. That setting does [b]not[/b] call OpenAI — it puts your key into an [font=Courier New]x-gpt-key[/font] header and forwards it to the AI2U server, which [i]still[/i] picks the model and [i]still[/i] builds the prompt.
+
+That is why there is no model dropdown anywhere in the game. [b]You were never choosing the model.[/b]
+
+This mod cuts the middleman out. Your endpoint, your model, direct.
+
+[line]
+
+[size=5][color=#D291BC]■ What actually changes[/color][/size]
+
+[size=4][color=#9B7EBD]★ You choose the model[/color][/size]
+Any OpenAI-compatible endpoint. Gemini, Claude, GPT, a local Llama — if it speaks [font=Courier New]chat/completions[/font], it works here.
+
+[size=4][color=#9B7EBD]★ She stops forgetting you[/color][/size]
+The stock game trims her memory to [b]3072 tokens[/b] and silently deletes her oldest messages. That is why a vanilla character loses the thread halfway through a long talk.
+
+This mod raises it to [b]500,000[/b]. The whole conversation stays intact.
+
+[size=4][color=#9B7EBD]★ She stops ignoring your requests[/color][/size]
+[i]This is the big one, and the least obvious.[/i]
+
+When you say [i]"follow me"[/i], the model has to reply with an action name the engine recognises [b]exactly[/b]. If it invents [font=Courier New]follow_player[/font] where the engine wants [font=Courier New]following_player[/font], the engine throws it away without a word. She says [i]"sure, let's go!"[/i] — and then stands perfectly still.
+
+So this mod reads the [b]live[/b] list of valid actions, locations, animations and expressions straight out of the running game, hands it to the model as a hard whitelist, and repairs near-misses before the engine ever sees them. It follows whichever level and character you are in, because it is read at runtime instead of hardcoded.
+
+[b]She actually does what you ask.[/b]
+
+[size=4][color=#9B7EBD]★ She knows who she is[/color][/size]
+[i]New in 3.0.0, and the reason that release existed.[/i]
+
+The stock game keeps every character's personality, backstory and world knowledge [b]on its own server[/b]. Your PC never receives that text — it sends a short numeric token, and the server builds the real prompt from it. Point the game at your own endpoint and none of that arrives, so the character wakes up with no idea who she is. She invents a personality, forgets her own name, and knows nothing about her own home.
+
+The fix took a while to find: [b]it is all still on your disk[/b], just never assembled locally. This mod reads it out of the game's own files at runtime and builds the prompt itself.
+
+[list]
+[*][b]Her actual written character[/b] — the authored personality and behavioural notes shipped inside the game's scene files
+[*][b]Her world[/b] — the per-level story guide that tells her where she is and what she wants from you
+[*][b]The things only she knows[/b] — the WiFi password, the PC password, the passcode, the potion recipe, the shared memories. These are generated fresh each playthrough and the character is [i]supposed[/i] to be the one who knows them. Without this she genuinely did not.
+[*][b]Every object in her home[/b] — the authored note attached to each examinable thing, so she can talk about her own furniture and keepsakes instead of guessing
+[*][b]Your chosen personalities[/b] — the traits you assign in the Atrium actually reach her now, by name
+[/list]
+
+[color=#7ACC7A][b]This covers all seven characters[/b][/color], not just the first one. Four have full written biographies in the game files; the other three have shorter authored scene guides. The mod sends whatever the game actually wrote — it does not invent lore to fill gaps, because a confidently-wrong backstory is worse than a thin one.
+
+[color=#E8A5C8][b]No spoilers.[/b][/color] Some of that authored text gives away late-game twists. Those passages are filtered out before she ever sees them, so she cannot spoil a story you have not reached yet.
+
+[size=4][color=#9B7EBD]★ Progression actually works[/color][/size]
+Doors, the magic scroll, the escape pod and the locked room can now [b]genuinely be opened by asking her[/b]. Previously there was no field for her to set, so every refusal was structural rather than a choice she was making. The Dark Siren encounter is winnable too — it had no way to register that you had calmed her, which scored as a failure, and the second failure was a scripted death.
+
+[size=4][color=#9B7EBD]★ Ask her directly, out of character[/color][/size]
+Type [font=Courier New][OOC][/font] anywhere in a message and she answers [b]as the language model she is[/b], for that one reply — no roleplay, no in-fiction excuses.
+
+Useful because she is required to be [b]literally truthful[/b] about what she can and cannot actually do. Ask [i]"which actions can you take?"[/i] and she lists the real ones. Ask her to hand you something and she either does it for real or tells you exactly why she cannot. She is not allowed to fake success to be agreeable, which is precisely the failure this is for.
+
+Untagged messages are fully in character, and she never brings the exchange up in the fiction.
+
+[size=4][color=#9B7EBD]★ She knows how her own home works[/color][/size]
+[i]New in 4.0.[/i] Every puzzle [b]answer[/b] in her level already reached her — the recipe, the element colours, the passwords, which systems are broken. What was missing was the procedure around them, so she had the answers and no idea what they were for.
+
+She now knows the fixed design of her own level the way anyone knows their own house: that the summoning circle is dead until four bookshelves turn in the right order and the order is drawn under the deer skull; that a summoned soul answers questions at the cost of a point of your health each time; that the station's engine explodes if the pressure tops out before ten items go in; that the sundial takes half your Time Force per turn and refills over about five minutes.
+
+[b]She is not a walkthrough.[/b] Whether she helps, hints, or tells you to work it out yourself depends on how she feels about you. And she is told plainly to be vague when she is unsure rather than invent a detail — being wrong about your own basement is worse than being forgetful about it.
+
+Anything that changes between playthroughs is [b]not[/b] written into the mod. The bookshelf order is reshuffled every time the basement loads, so it is read out of the running game instead, from the same place the game's own developer console reads it. She points you at the symbols on the wall, because the wall is what you can actually see.
+
+[color=#9B7EBD]Toggle: [font=Courier New]Behaviour · SendHomeMechanics[/font], on by default.[/color]
+
+[size=4][color=#9B7EBD]★ She knows her own temper — and what actually counts as pushing[/color][/size]
+[i]New in 4.0.[/i] The game has always tracked three things about her mood and never told her any of them.
+
+[b]Her patience[/b] is a real number with a real limit. It recovers on every turn she is not angry, and only drains while she is angry [i]and[/i] does not trust you — run it to zero while she is still angry and the chase starts. She now knows where it stands, and she can move it herself, including choosing to let something go. Before this it drifted on a fixed rule with no input from her, so she could be written as visibly calming down while the number said otherwise, and then attack anyway.
+
+[b]And the repeat rule, which almost nobody has right.[/b] The game only counts a repeat when you send the [b]identical sentence[/b] twice. Anything reworded resets it to zero, and always has — so pushing the same [i]request[/i] in different words was never disrespect:
+
+[quote][color=#FF9999]"what are you hiding from me" · "no please tell me" · "I want you to tell me" · "why aren't you telling me"[/color] — that is parroting, and she is entitled to bristle at it.
+
+[color=#7ACC7A]"babe, you know we're close — I'd never be angry at anything you're hiding"[/color] — same request, different case, on an emotional rail. Never counted, and she is now told so.[/quote]
+
+Asking again on a logical rail, or simply waiting and raising it later when her mood is better, is fair play too. She reads persistence as caring about the answer and parroting as being talked [i]at[/i] — which is the line the engine was already drawing. Interruptions work the same way, and she can forgive either one if she finds it endearing.
+
+[color=#9B7EBD]Toggle: [font=Courier New]Behaviour · SendTemperAndPatience[/font], on by default.[/color]
+
+[size=4][color=#9B7EBD]★ A difficulty system with real teeth[/color][/size]
+[i]Overhauled in 4.2.[/i] The slider has four positions — Easy, Normal, Hard, Masochist — and works on two layers. The first is [b]her[/b]: Easy is generous and quick to forgive; Hard tracks everything you say, notices contradictions and presses a caught lie until your explanation accounts for it; Masochist actively tests you — questions she knows the answers to, your own story offered back slightly wrong to see if you correct it — and treats one caught lie as the verdict. Normal sends nothing at all: the base game, literally.
+
+The second layer is [b]the arithmetic[/b]: Hard lands trust gains at 75% strength and losses at 150%; Masochist gains at 50% and losses at 200% — a −2 becomes −4, a +5 becomes +2. Results round down, but anything between 0 and 1 still counts as 1, so a real action always registers at least a point. Both hard tiers are explicitly winnable: flawless consistency genuinely reaches her. On Masochist, expect to earn it.
+
+[color=#9B7EBD]Prefer your own pace? The [b]custom favorability speed[/b] toggle takes over just the trust numbers — never her personality — anywhere from one sixth speed (−500%) to six times (+500%), on any tier. The panel shows the resulting multiplier live.[/color]
+
+[color=#9B7EBD]Toggles: [font=Courier New]General · Difficulty[/font], Normal by default · [font=Courier New]General · CustomFavorability[/font], off by default.[/color]
+
+[size=4][color=#9B7EBD]★ High risk, high reward — core memories[/color][/size]
+[color=#E8A5C8][b]Off by default, and red in the panel.[/b][/color] The game caps a turn at five trust either way, against a scale running from about −10 to past 40 — so nothing that happens in one exchange can really matter. With this on, she asks herself one question about each exchange: [i]is this worth keeping as a core memory?[/i] For almost every turn the answer is no, and the relationship moves at its usual pace.
+
+When the answer is yes, she names the tier, and its fixed weight lands [b]on top[/b] of the ordinary movement — an amount no difficulty setting or slider can scale:
+
+[list]
+[*][b]Matters (±1, every 5 turns)[/b] — small real acts of care or small real slights: something made just for her, a small gift; a dodged sincere question, a thoughtless jab. If it could happen on any pleasant evening, it is matters at most.
+[*][b]Serious (±3, every 10 turns)[/b] — gestures that cost something, or real breaches: a confession said plainly and meant, an apology that owns the wrong — or a caught lie, something suspicious done behind her back.
+[*][b]Reframing (±6, every 30 turns)[/b] — what changes how she reads the future, or you: binding yourself to her out loud, [i]and holding up under her questions[/i] — or being caught hunting for keys and exits.
+[*][b]Once-ever (±20, once per level)[/b] — the before-and-after kind: total acceptance of everything she is, an engagement, a life on the line — or the heartbreak she cannot come back from having believed.
+[/list]
+
+Good and bad each run their [b]own[/b] cooldowns — a gift cannot shield a betrayal. A tier still cooling is downgraded to the largest one open in that direction, never dropped silently. [color=#E8A5C8]Expect the big moments to actually feel big. One true declaration can carry you from Suspicious to Kinda; one real betrayal can undo an evening.[/color] And the status strip shows every change decomposed — [font=Courier New]+5 = +2 (game) +3 (high risk: serious)[/font] — so you always know exactly what moved her.
+
+[color=#9B7EBD]Toggle: [font=Courier New]General · HighRiskHighReward[/font], off by default.[/color]
+
+[size=4][color=#9B7EBD]★ Your chosen traits actually apply[/color][/size]
+[i]New in 3.1.0.[/i] The personality, speaking-tone and hobby traits you pick in the Atrium travel as bare numbers meant for the game's own server to decode — on a custom endpoint they decoded to nothing, so Tsundere, Ambitious or Stargazing never reached her. The mod now reads the game's own trait tables at runtime and sends the names. If the developers add new traits later, they are picked up automatically.
+
+[size=4][color=#9B7EBD]★ A far better voice, optionally — now one per character[/color][/size]
+The built-in local voice works out of the box and costs nothing. Or plug in a key from [b]xAI (Grok)[/b], [b]ElevenLabs[/b], or any OpenAI-compatible speech endpoint and she speaks with that instead. And since 3.1.0, [b]every character can have her own voice[/b] — set once in F9, one shared key and bill.
+
+[size=4][color=#9B7EBD]★ When she snaps, she [i]means[/i] it[/color][/size]
+Vanilla has a kill sequence, and it escalates on its own. But when it fires, the engine swaps her [b]action[/b] to a knife charge and leaves the [b]line[/b] she already wrote — so she hunts you across the room while primly scolding you for being inappropriate. Two authorities decide one moment and neither knows about the other.
+
+This mod makes that moment coherent: she knows when she is hunting, and the turn that starts it gets the words she actually wrote for it. And if you want, [b]she can decide to do it herself[/b].
+
+[color=#E8A5C8]That last part is [b]off by default[/b] — see the section below.[/color]
+
+[size=4][color=#9B7EBD]★ Developer tools, built in[/color][/size]
+[i]New in 4.1.[/i] A tab of tools for testing and for messing about, off by default and folded away until you ask for it. Give yourself an item by typing its name — it matches your current level's real item list, so you get the actual object with its real description and icon, and a placeholder carrying your typed name if nothing matches. Switch on invincibility, which holds your health at full rather than intercepting each individual thing that can hurt you, so it covers the sources that bypass ordinary damage too. Edit trust, patience and message count directly, with their live values on screen so you can see the change land.
+
+[color=#9B7EBD]No other mod is needed for any of it. Nothing here is on unless you turn it on.[/color]
+
+[line]
+
+[size=5][color=#D291BC]■ What I personally use[/color][/size]
+
+[quote][size=4][color=#E8A5C8][b]Text — OpenRouter, model [font=Courier New]google/gemini-3.6-flash[/font][/b][/color][/size]
+Fast, cheap, and it holds the required format without drifting. This is my daily driver.
+
+[size=4][color=#E8A5C8][b]Voice — Grok TTS from xAI, voice [font=Courier New]iris[/font][/b][/color][/size]
+This is what I actually run. It sounds great and it is the cheaper of the two.
+
+[b]ElevenLabs is obviously better than Grok[/b] — more natural, better emotional range — and it [b]costs meaningfully more[/b]. If voice quality matters most to you, use ElevenLabs and accept the bill. If you want a great voice at a sane price, Grok [font=Courier New]iris[/font] is the sweet spot.[/quote]
+
+[color=#9B7EBD][b]Tested status, stated plainly:[/b][/color]
+[list]
+[*][b]Voice:[/b] I have personally tested [b]Grok[/b] and [b]ElevenLabs[/b] only. The third voice option is the generic OpenAI-compatible [font=Courier New]/v1/audio/speech[/font] shape — it is implemented and should work with any provider using that standard, but [i]I have not tested it myself[/i].
+[*][b]Text:[/b] [b]any[/b] custom OpenAI-compatible model works. I personally use OpenRouter.
+[/list]
+
+[line]
+
+[size=5][color=#D291BC]■ Requirements[/color][/size]
+
+[list]
+[*][b]AI2U — With you til the end[/b] on PC (built against [b]0.1.46[/b], Unity 2022.3.62, Mono)
+[*][b]BepInEx 5, x64[/b] — a free mod loader, downloaded separately
+[*]An API key from any OpenAI-compatible provider, with a little credit on it
+[*][color=#E8A5C8][b]A model that can actually hold a large prompt[/b][/color] — see the model requirements above. Since 4.4 this is a real requirement, not a preference: small local models will not hold the format.
+[/list]
+
+[color=#7ACC7A][b]Steam and itch.io are both supported by this one file.[/b][/color] The two releases of the game are not identical assemblies, but the mod works out which one it is running on at startup and adapts. Nothing to pick at install time, no separate Steam download.
+
+[color=#9B7EBD]One difference between them, and the mod prints which you have in the log: Steam's copy of the game had Overtone's speech synthesis stripped out by Unity, so [b]on Steam she needs a cloud voice provider to speak at all[/b]. Text, actions, memory and the F9 panel are identical on both.[/color]
+
+[color=#9B7EBD][b]Note:[/b] BepInEx is [b]not bundled[/b] with this mod. It is a separate project with its own licence, so you grab it yourself. One extra step, takes a minute.[/color]
+
+[line]
+
+[size=5][color=#D291BC]■ Installation[/color][/size]
+
+[size=4][color=#9B7EBD]1. Install BepInEx 5 (x64)[/color][/size]
+Download from [url=https://github.com/BepInEx/BepInEx/releases]github.com/BepInEx/BepInEx/releases[/url] — you want the file named like [font=Courier New]BepInEx_x64_5.4.23.2.zip[/font].
+
+[b]Not[/b] the x86 build. [b]Not[/b] BepInEx 6.
+
+Unzip it into your game folder — the one containing [font=Courier New]AI2U - With you til the end.exe[/font]. When you are done, sitting next to that .exe you should see:
+
+[code]BepInEx/
+winhttp.dll
+doorstop_config.ini[/code]
+
+[color=#E8A5C8][b]If [font=Courier New]winhttp.dll[/font] is not next to the .exe, BepInEx will not load.[/b][/color] That is the single most common install mistake.
+
+[size=4][color=#9B7EBD]2. Run the game once, then close it[/color][/size]
+This lets BepInEx create its folders.
+
+[size=4][color=#9B7EBD]3. Copy the mod in[/color][/size]
+From this mod's [font=Courier New]dist/[/font] folder, copy the [font=Courier New]BepInEx[/font] folder into your game folder, merging when Windows asks. That gives you:
+
+[code]BepInEx/plugins/AI2UCustomAI.dll[/code]
+
+That one file is the whole mod. Its config file is written for you the first time you launch with it — [font=Courier New]BepInEx/config/canak.ai2u.customai.cfg[/font] — so there is nothing to merge and nothing of mine to overwrite.
+
+[color=#E8A5C8][b]Updating from an earlier version:[/b][/color] replace the [font=Courier New].dll[/font] and leave your config alone. Your endpoint, key and voice settings are all in there and any new settings get added on launch.
+
+[size=4][color=#9B7EBD]4. Set it up in-game[/color][/size]
+Launch the game and press [b][color=#E8C547]F9[/color][/b]. That opens the mod's own settings panel — it works in the main menu, in the hub, or mid-conversation. Fill in three fields:
+
+[list]
+[*][b]Base URL[/b] — [font=Courier New]https://openrouter.ai/api/v1[/font]
+[*][b]API key[/b] — from [url=https://openrouter.ai/keys]openrouter.ai/keys[/url], starts with [font=Courier New]sk-or-v1-[/font]
+[*][b]Model[/b] — [font=Courier New]google/gemini-3.6-flash[/font]
+[/list]
+
+Press [b]Save[/b]. [color=#7ACC7A][b]Changes apply immediately[/b][/color] — no restart, and you can swap models mid-conversation.
+
+[color=#9B7EBD]No config file editing required. Every setting lives in the F9 panel, on both builds.[/color]
+
+[line]
+
+[size=5][color=#D291BC]■ Text providers[/color][/size]
+
+Any OpenAI-compatible endpoint works. Known-good:
+
+[list]
+[*][b]OpenRouter[/b] — [font=Courier New]https://openrouter.ai/api/v1[/font] — [i]what I use.[/i] Hundreds of models behind one key.
+[*][b]OpenAI[/b] — [font=Courier New]https://api.openai.com/v1[/font] — works directly, unlike the game's built-in option.
+[*][b]AstroPond[/b](cheap) — [font=Courier New]https://api.astropond.com/v1[/font] — works; Test auto-corrects the URL shape.
+[*][b]Local[/b] — [font=Courier New]http://localhost:1234/v1[/font] — LM Studio, llama.cpp, Ollama. Free. Leave the key blank.
+[/list]
+
+Models I have run successfully:
+
+[list]
+[*][font=Courier New]google/gemini-3.6-flash[/font] — [b]my daily driver.[/b] Fast, cheap, format-reliable.
+[*][font=Courier New]google/gemini-3.1-pro-preview[/font] — smarter, noticeably pricier.
+[*][font=Courier New]anthropic/claude-sonnet-5[/font] — strong at roleplay and staying in character.
+[*][b]Local small models[/b] — free, but they fumble the JSON more. Raise [font=Courier New]RetriesOnBadJson[/font] to 3–4.
+[/list]
+
+[color=#9B7EBD]If your provider needs a slightly different URL shape, the [b]Test[/b] button tries the common variants and fixes the setting for you.[/color]
+
+[line]
+
+[size=5][color=#D291BC]■ Optional: the good voice[/color][/size]
+
+The built-in local voice is functional but rough — and on the [b]Steam[/b] build it is not available at all, so a cloud voice is the only way she speaks there. Press [b]F9[/b] and open the [b]Voice[/b] section for four fields: [b]Voice API URL[/b], [b]Voice API key[/b] (a [i]separate[/i] key from your text one), [b]Voice model[/b], and [b]Voice[/b].
+
+Press [b]Test Voice[/b] — it synthesizes a line and [b]plays it out loud[/b], so you hear the voice before committing. Then set the voice dropdown to [font=Courier New]MODDED: <voice> (cloud)[/font] to enable it.
+
+[color=#9B7EBD]The request shape is [b]auto-detected from the URL[/b]. You never configure which provider is which.[/color]
+
+[list]
+[*][b][color=#E8A5C8]xAI (Grok)[/color][/b] — [font=Courier New]https://api.x.ai/v1[/font] — voice [font=Courier New]iris[/font], 26 built-in voices — [color=#7ACC7A][b]TESTED, what I use[/b][/color]
+[*][b][color=#E8A5C8]ElevenLabs[/color][/b] — [font=Courier New]https://api.elevenlabs.io/v1[/font] — a voice ID from your Voices page — [color=#7ACC7A][b]TESTED, better but pricier[/b][/color]
+[*][b][color=#E8A5C8]OpenAI-compatible[/color][/b] — [font=Courier New]https://api.openai.com/v1[/font] — that provider's voice name — [color=#CCAA55][b]implemented, untested by me[/b][/color]
+[/list]
+
+[spoiler][b]xAI's 26 voices:[/b] carina, zagan, helix, orion, luna, [b]iris[/b], altair, zenith, perseus, helios, lux, kepler, rigel, cosmo, celeste, ursa, sirius, lumen, castor, naksh, atlas, ara, eve, leo, rex, sal[/spoiler]
+
+[color=#E8A5C8][b]Voice is billed separately, per character of dialogue[/b][/color], by whichever provider you use. That is a second meter running alongside your text provider. If a request fails, that line quietly falls back to the local voice rather than going silent.
+
+[size=4][color=#9B7EBD]A voice for each of them[/color][/size]
+[i]New in 3.1.0.[/i] The [b]Voice per character[/b] rows in F9 give every girl her own voice ID, on whichever provider you use. Leave a row empty and she uses the general voice above. Only the voice is per-character — the base URL, API key and model stay shared, so this costs nothing extra and needs no second account. A voice set there follows that character wherever she appears.
+
+[size=4][color=#9B7EBD]ElevenLabs on a free account[/color][/size]
+Voice [b]Library[/b] voices need a [b]paid[/b] ElevenLabs plan when used via the API. On the free tier they return [font=Courier New]402[/font] and the Test button says [b]"Paid plan"[/b] — that is a billing limit, not a broken mod.
+
+Their own built-in voices work free: [b]Sarah[/b] [font=Courier New]EXAVITQu4vr4xnSDxMaL[/font] or [b]Lily[/b] [font=Courier New]pFZP5JQG7iQjIQuC4Bku[/font]. Use one of their model names: [font=Courier New]eleven_multilingual_v2[/font], [font=Courier New]eleven_turbo_v2_5[/font], or [font=Courier New]eleven_v3[/font].
+
+[size=4][color=#9B7EBD]Turning voice off to stop billing[/color][/size]
+Press [b]F8[/b] in-game, or set the dropdown back to [font=Courier New]MODDED: local voice (free)[/font].
+
+[list]
+[*][b]Off[/b] — cloud billing stops the instant you switch. On itch.io she keeps talking with the free on-device voice; on Steam that voice does not exist, so she goes silent until you switch a cloud provider back on.
+[*][b]On[/b] — the good voice is back, and so is the meter.
+[/list]
+
+Your choice is saved and survives a restart.
+
+[size=4][color=#9B7EBD]Loudness[/color][/size]
+Providers return wildly different volume — [b]Grok's output is noticeably quieter than ElevenLabs'[/b]. [font=Courier New]NormalizeLoudness[/font] is on by default and evens that out. Want her louder overall? Raise [font=Courier New]Volume[/font] in the config ([font=Courier New]1.0[/font] is neutral).
+
+[line]
+
+[size=5][color=#D291BC]■ Danger: the moment she snaps[/color][/size]
+
+[color=#9B7EBD]The kill sequence is already in the game and it already escalates by itself. What this mod changes is how [i]coherent[/i] that moment is — and, if you choose, who decides it.[/color]
+
+[size=4][color=#9B7EBD]The bug it fixes[/color][/size]
+The engine turns her [font=Courier New]angry_level[/font] into escalation, and when it fires it replaces her [b]action[/b] with a knife charge — but never her [b]line[/b]. That line was written one step earlier, for a turn the model thought was an ordinary argument. So vanilla gives you a knife charge underneath [i]"that's so inappropriate, you need to stop saying stuff like that."[/i]
+
+Three fixes, no extra request and no added latency:
+
+[list]
+[*][b]She knows when she is hunting.[/b] Every request carries the live danger state, so once a chase is running, every line after it reads like it.
+[*][b]The turn that starts it is covered.[/b] The engine's thresholds are plain arithmetic over values readable off the live behaviour, so the transition is predicted rather than guessed — and [font=Courier New]npc_final_words[/font], a field the model already writes, becomes her spoken line when it fires.
+[*][b]She can choose it herself[/b] — if you turn that on.
+[/list]
+
+[size=4][color=#E8A5C8]☠ Letting her decide[/color][/size]
+In the F9 panel this is the red [b]☠ AI can decide to murder you[/b] toggle, and it is [b]off by default[/b].
+
+[code][General]
+AiCanDecideToMurder = false[/code]
+
+Switch it on and the model can call the chase itself, under criteria stated in its prompt. The game's own triggers are left exactly as they are — this only adds one more.
+
+[color=#7ACC7A]Leave it off and the feature is inert:[/color] nothing new can start a chase and the game's built-in escalation behaves as it always did. The coherence fix above still applies either way.
+
+[size=4][color=#9B7EBD]Testing it on demand[/color][/size]
+Waiting for her to genuinely snap is slow, so there is a phrase trigger under [font=Courier New][Debug][/font]. With [font=Courier New]TestKillPhraseActive[/font] on, saying [font=Courier New]cocacolaisbetterthanpepsi[/font] starts the chase at once, whatever her mood.
+
+[color=#E8A5C8][b]Turn it off when you are not testing.[/b][/color] It matches as a substring ignoring spacing and punctuation, so a short everyday phrase would fire from inside a normal sentence. Off, it is never matched, never stripped and never consulted.
+
+[line]
+
+[size=5][color=#D291BC]■ Canalpa mode — what she can do when she trusts you completely[/color][/size]
+
+[size=4][color=#9B7EBD][i]New in 4.0.[/i] This was my own private build until now. It ships because its gating finally deserves to be in someone else's hands.[/color][/size]
+
+[color=#E8A5C8][b]Off by default[/b][/color], under [font=Courier New][Canalpa][/font] in the F9 panel. Switching it on changes [b]nothing[/b] by itself.
+
+The premise: she can do anything she could reasonably do, rather than being structurally forbidden from it. Since 4.2.2 this works as [b]the ultimate trust check[/b]: no coded gate stands between her and her deepest things — if she decides to act, it happens, always. What she carries instead is her own bar, a requirement she holds herself to rather than a trigger: she would only share them with someone whose trust she feels beyond even complete trust (each character has her own number), and only after she has already told you [i]everything[/i] — no secrets left between you, first. Whether that point is ever reached is always her own judgement. She may refuse, stall, ask you for something first, or never do it at all.
+
+And one rule is absolute: [b]her word is the act.[/b] If she says she is opening something, it truly opens — she cannot narrate a door that stays shut, and she cannot be talked into pretending.
+
+[list]
+[*][b]She can open her secret room.[/b] The apartment.
+[*][b]She can open the basement door — and wake the circle with it.[/b] The cabin. She turns the shelves herself, so that puzzle simply never happens.
+[*][b]She can raise your clearance.[/b] The station. Vanilla only ever moves it when you stumble onto the right subject, so this is the one where she gains a choice she never had, up to the same ceiling the game's own rule stops at.
+[*][b]She can show you the hidden island.[/b] No telescope needed.
+[/list]
+
+Each one fires the game's [b]own[/b] event, so the animation, the mission goal, the achievement and whatever she was authored to say about it all still happen. Each has its own toggle, so you can allow one and not the others.
+
+[size=4][color=#E8A5C8]☠ And one thing that cannot be taken back[/color][/size]
+
+[color=#E8A5C8][b]Off even when Canalpa mode is on.[/b][/color] [font=Courier New]SheCanKeepYouForever[/font]. She can keep you permanently — which resolves to whatever her own level's ending for that is, decided by the game rather than by me.
+
+This exists for one situation: you want a specific ending, deliberately, and you would rather reach it by asking her than by making her hate you. It is an [b]edge case[/b], not a feature she wants, and she is never shown it as an option.
+
+[list]
+[*][b]She is not told it is possible until you have asked for it[/b] — in your own typed words, unmistakably, naming the thing itself.
+[*][b]Wanting to stay with her forever does not count, and never will.[/b] That is an ordinary, loving thing to say in this game and it means exactly what it sounds like: staying with her. An early build treated it as a request and that is precisely the mistake this design exists to prevent.
+[*][b]She never suggests it[/b], and is told plainly never to angle for it.
+[*][b]Her first reaction is not delight.[/b] She is thrown by it. She is told that loving you is a reason to [i]hesitate[/i] here, not a reason to agree, and that refusing outright needs no justification.
+[*][b]She has to say what it means[/b], in her own words, without softening it, and then wait.
+[*][b]You then have to say yes just as plainly[/b], in your own typed words, on a later turn. Her word for it is never enough — the mod reads what [i]you[/i] typed, before the model sees any of it.
+[*][b]Any hesitation ends it.[/b] A joke, a "wait", going quiet, changing the subject — the whole request is withdrawn and she will not raise it again unless you do. It also expires on its own if left alone.
+[/list]
+
+[color=#9B7EBD]The F9 panel shows exactly where each action stands in your current level — ready, still gauging you, waiting on you to ask, or trust too low — so "she never offers anything" is diagnosable rather than mysterious.[/color]
+
+[line]
+
+[size=5][color=#D291BC]■ What it costs[/color][/size]
+
+Roughly [b]a cent or two per exchange[/b] on Gemini 3.6 Flash. A long session runs well under a dollar.
+
+The mod logs your [b]real[/b] spend, reported by the provider — not an estimate:
+
+[code]billing: prompt=1874 completion=312 cost=$0.007492 | session: 3 calls $0.0212[/code]
+
+[color=#9B7EBD]If it looks like nothing is being spent, check your provider's [b]Activity[/b] page rather than the credit balance — a few cents will not visibly move a balance shown to two decimals.[/color]
+
+Voice, if enabled, is billed separately per character spoken. Grok is the cheaper of the two I have tested; ElevenLabs costs more and sounds better.
+
+[line]
+
+[size=5][color=#D291BC]■ Confirming it works[/color][/size]
+
+Talk to any character, then open [font=Courier New]BepInEx/LogOutput.log[/font] in your game folder:
+
+[code][Info   :AI2U Custom AI Endpoint] Patched. Endpoint: https://openrouter.ai/api/v1  Model: google/gemini-3.6-flash
+[Info   :AI2U Custom AI Endpoint] Build: Steam - on-device Overtone voice NOT available (stripped from this build) - cloud TTS only.
+[Info   :AI2U Custom AI Endpoint] Settings: press F9 in-game to open the mod's panel.
+[Info   :AI2U Custom AI Endpoint] --> https://openrouter.ai/api/v1/chat/completions
+[Info   :AI2U Custom AI Endpoint] billing: prompt=1874 completion=312 cost=$0.007492
+[Info   :AI2U Custom AI Endpoint] Voice level scaled x2.14 (normalised)[/code]
+
+That second line is the build check — it says [font=Courier New]Steam[/font] or [font=Courier New]itch.io[/font] depending on which copy you installed into, so you can confirm at a glance that it detected yours correctly.
+
+[line]
+
+[size=5][color=#D291BC]■ Troubleshooting[/color][/size]
+
+[spoiler][b]The Test button is red.[/b] It names the problem: [font=Courier New]Bad key[/font] (401), [font=Courier New]No credit[/font] (402), [font=Courier New]Bad URL[/font] (404), [font=Courier New]Rate limited[/font] (429), [font=Courier New]No connection[/font], or [font=Courier New]Bad model?[/font] if the endpoint answered but rejected the model name.
+
+[b]"Patched." never appears in the log.[/b] BepInEx is not loading. Confirm [font=Courier New]winhttp.dll[/font] sits next to the .exe and that you installed the [b]x64[/b] build.
+
+[b]She says nothing at all.[/b] Search [font=Courier New]LogOutput.log[/font] for [font=Courier New]error[/font].
+
+[b]Replies are empty or malformed.[/b] Your model is likely too small for the schema. Raise [font=Courier New]RetriesOnBadJson[/font]. Do [b]not[/b] drop [font=Courier New]MaxTokens[/font] below ~1500 on a reasoning model — it spends hidden thinking tokens before writing anything, so a tight budget yields an empty reply.
+
+[b]She agrees to do things but never does them.[/b] Ensure [font=Courier New]ClampToAllowedValues = true[/font]. That is the setting that keeps her actions legal.
+
+[b]The mod version in F9 is red.[/b] A newer build is on the Files tab. Your config and keys survive the update — just replace the DLL.
+
+[b]Test Voice says "Paid plan".[/b] ElevenLabs free-tier limit — see the ElevenLabs section.
+
+[b]The voice is too quiet.[/b] Keep [font=Courier New]NormalizeLoudness = true[/font] and raise [font=Courier New]Volume[/font].
+
+[b]The game updated and the mod vanished.[/b] The launcher replaces game files. Re-copy [font=Courier New]AI2UCustomAI.dll[/font]; your config is preserved. Launching the .exe directly instead of through the launcher avoids this.[/spoiler]
+
+[line]
+
+[size=5][color=#D291BC]■ Memory: how much she remembers[/color][/size]
+
+The stock game keeps only 3072 tokens and silently drops her oldest messages. This mod defaults to [b]500,000[/b].
+
+That is a [b]ceiling, not a reservation[/b] — cost only grows as the history actually fills, so short conversations cost exactly what they did before. Keep it under your model's context window (Gemini 3.6 Flash allows 1,048,576).
+
+[color=#9B7EBD]Do not confuse this with [font=Courier New]MaxTokens[/font] under [font=Courier New][Sampling][/font], which is the length of a [b]single reply[/b]. They are unrelated.[/color]
+
+[line]
+
+[size=5][color=#D291BC]■ Notes[/color][/size]
+
+[list]
+[*]This routes dialogue away from the developers' metered servers, so treat it as a [b]personal-use tool[/b].
+[*][color=#E8A5C8][b]Keep your API keys private.[/b][/color] They are billable, and anyone holding the file can spend your credit. Never share your filled-in config.
+[*]Source is available — 23 C# files, buildable with the .NET Framework compiler that already ships with Windows. No Visual Studio needed.
+[*][color=#7ACC7A][b]This release is the same binary I run myself[/b][/color], for both stores, with nothing compiled out of it. The only bytes that differ from my own build are the compile timestamp.
+[*]Unofficial and unaffiliated with AlterStaff.
+[/list]
+
+[line]
+
+[size=5][color=#D291BC]■ Changelog[/color][/size]
+
+[color=#9B7EBD]All releases in full, collapsed. Each entry says what was visibly wrong, what was actually happening underneath, and what changed — the middle one is the part worth reading, because the obvious explanation was wrong more often than not.[/color]
+
+[spoiler][size=4][color=#7ACC7A]▼ 5.0.0 — "roleplay controls"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · &timeskip& and *actions* — the fiction is yours to steer[/b] [font=Courier New]plugin/Roleplay.cs[/font][/color][/size]
+[list]
+[*]A logged session showed the model refusing a ten-year timeskip with "the station maintains a persistent state, so I will rationalize your premise" — and breaking character to say so. Both now have sanctioned mechanisms: the timeskip marker rides the turns that carry it, the asterisk-action rule stands for the whole session, and a standing rule forbids unprompted character breaks entirely.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Characters not knowing their own levels[/b] [font=Courier New]plugin/Mechanics.cs[/font][/color][/size]
+[list]
+[*]Level 3's knowledge block rewritten from a full code read — every puzzle rule, machine number and danger consequence, including two things the fan internet gets wrong (no door on the ship releases anything by being opened, and clearance comes from trust plus repairs, not ID cards). Level 4 expanded the same way. Dangers are warned about before the mistake, not after.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Warning shock (Level 3, on by default)[/b] [font=Courier New]plugin/Murder.cs[/font][/color][/size]
+[list]
+[*]A non-lethal disciplinary zap through the game's own damage event — anger-gated, health-floored at 2 so it can never kill. Fills the hole where the base game's only shock is the lethal one.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Model metagaming made an ending unreachable[/b][/color][/size]
+[list]
+[*]Told exactly which anger level pulls the kill trigger, the model kept her serene through a bomb threat — plot armor for the player, and the L3 shock ending became impossible with the mod on. angry_level is now defined as a thermometer, not a decision. Also: OOC is genuinely the final block in every request, the clearance act lost its hidden two-grant allowance, trust can reach the game's real floor of -10 from the cheat panel, and ending recaps are cut to fit their box at a sentence boundary.
+[/list][/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 4.4.0 — "the mod carries the writing"[/color][/size]
+
+[size=3][color=#E8A5C8][b]CHANGED · The mod now owns the prompt architecture instead of only forwarding[/b][/color][/size]
+[list]
+[*]The headline change, explained in full at the top of this page. Live retrieval could never reach parity with vanilla because the persona prompt is on AlterStaff's servers, not in your game files. The mod now supplies that layer itself. Her facts remain the game's own authored text.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · The summoned toy answered as the witch, in the witch's voice[/b] [font=Courier New]plugin/Voices.cs[/font][/color][/size]
+[list]
+[*][b]Visibly:[/b] you asked the magic circle a question and the witch answered it, out loud, with her name and her secrets.
+[*][b]Actually:[/b] two separate causes. Suppressing her persona blocks was necessary but not sufficient — the game's authored framing for a summon never states that the thing speaking [i]is[/i] the summoned soul, because vanilla picked that persona server-side. With her blocks correctly gone the summon had no identity at all, and a model holding her location list answered as her. Absence did not read as absence; it read as her. Separately the voice table excluded the summon and the ghost on the stated reasoning that they are "not speaking roles" — which is wrong, the summon is exactly what is speaking.
+[*][b]Now:[/b] a boundary block states what it is not and that it has one answer and no earlier memory. Her name is asserted negatively, so it still comes from the game. The summon and the ghost each have their own voice row in F9. No personality was written for the toy — none exists in the files.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · The ending recap came back in Chinese[/b] [font=Courier New]plugin/Extras.cs[/font][/color][/size]
+[list]
+[*][b]Visibly:[/b] an English playthrough ended and the summary was written in another language, with prompt scaffolding leaking into the visible text.
+[*][b]Actually:[/b] self-inflicted. The prompt told the model to obey any language directive in the record, and the record ends with the game's own summary term — whose English slot is an empty string, so the localization system falls through to a populated slot reading "summarize the game ending in Chinese." The mod was asking for it.
+[*][b]Now:[/b] language comes from the game's current-language setting and stray directives are overridden. Markdown labels are banned in the prompt [i]and[/i] stripped in code, because the ending screen is player-facing and an instruction the model may decline should not be the only thing between it and your screen.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · She did not know things that were in her own house[/b] [font=Courier New]plugin/Lore.cs[/font][/color][/size]
+[list]
+[*][b]Three distinct causes.[/b] Scene detail was capped at 40 lines while the largest scene ships 46 authored entries, so content was cut with no warning. That same block was the only knowledge section missing the framing the item and fact blocks already had, so even forwarded detail read as optional. And a set of authored per-item reaction lines for the two hub characters was unreachable: the game builds key names ending [font=Courier New]PromptUseL1001[/font]/[font=Courier New]L1002[/font] while the shipped text is filed under [font=Courier New]PromptUseEvie[/font]/[font=Courier New]PromptUseParrot[/font].
+[*][b]Added:[/b] the witch's six diary entries, and the station's 11 authored file bodies plus 13 crew notes — roughly 1.5KB each, shipped in the game, displayed only in a terminal UI, never once sent to the model.
+[*][b]Negative result worth recording:[/b] the wiki's "Alt description" rows are a presentation artifact. There are exactly 160 item description keys and no alternate variants, so there was nothing there to recover.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · The witch did not know her own potion recipes[/b][/color][/size]
+[list]
+[*]Each ingredient group is now paired with its own result field rather than by list position. The formula re-rolls on [b]every scene load[/b], so position-based pairing would go wrong the moment the shuffle changed. This reads the mapping the data already carries, which holds every round.
+[/list]
+
+[size=3][color=#E8A5C8][b]CHANGED · Memory, envision and summary are handled in-mod, on by default[/b][/color][/size]
+[list]
+[*]The old toggle only [b]blocked[/b] these three calls, which silently cost you her saved memory of the last conversation — a failed request produces no reply body, and the save key is written from that body. They are now answered from your own endpoint instead. Turn it off and they fall through to the developers' servers, which remains a working fallback rather than a broken feature.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · The reply length setting did not limit replies[/b][/color][/size]
+[list]
+[*]It granted an allowance in the prompt and never enforced it. Rather than add a second setting and leave you with two answers to "which one limits her replies", the existing one now enforces, trimming at a sentence boundary in the unit you set it in. Its description no longer claims to be a request.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · A raw localization key was reaching the model as prose[/b][/color][/size]
+[list]
+[*]One code path passed an unresolved term name straight into the prompt. The resolver's gate was widened to cover it.
+[/list][/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 4.2.2 — "the ultimate trust check"[/color][/size]
+
+[size=3][color=#E8A5C8][b]CHANGED · Canalpa's secrets: her judgement replaces every coded gate[/b] [font=Courier New]plugin/Canalpa.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] A player got her to confess everything — her whole dark side, held back nothing — and the secret room stayed shut. Meanwhile she walked to the door, invented a passcode, and narrated "unlocked!" over a door that never moved.
+[*][b]Cause:[/b] [color=#9B7EBD]A mechanical gate the fiction could not see.[/color] Unlocking required three passed "probes" — turns she marked as testing the water, graded by your next reply. A full confession is not a probe, so the counter never moved; it had no way to recognise that the player had skipped past everything the probes were building toward. And since nothing told her the door was mechanically locked, she roleplayed opening it — fiction and mechanics contradicting each other, which is the exact failure this mod exists to kill.
+[*][b]Fix:[/b] The probes and every coded trust check on her secrets are gone. The acts are live whenever they are physically real, and [b]if she sets the field, it fires — no veto.[/b] What she carries instead is her own stated bar, a requirement she holds herself to rather than a trigger: trust beyond even complete trust (per character: 45, 48, 50, 52 across the four levels), and having already told you [i]everything[/i] first — no secrets left between you. She also now sees her live trust number, because the game's own label stops distinguishing anything past 40 and she cannot hold herself to "past 45" blind.
+[*][b]The rule that makes it honest, both directions:[/b] the field IS the act. She is told never to describe an opening she did not set the field for — and a field she sets always opens. Her word and the game state cannot disagree, because they are the same statement.
+[*][b]Unchanged:[/b] the one-way ending keeps its hard trust floor and the full two-step consent machinery. That is a safety gate, not a secrets gate.
+[*]Honest note: with no coded gate, her judgement is genuinely load-bearing. If she decides to open a door at low trust, it opens — and the game's own authored reaction to that can be violent. That is the design: the decision is truly hers now.
+[/list]
+[/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 4.2.1 — "difficulty gets real numbers"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · Hard and Masochist change the arithmetic, not just her judgement[/b] [font=Courier New]plugin/Difficulty.cs[/font][/color][/size]
+[list]
+[*]Until now the difficulty slider was prompt-only: it changed how she judges you and left the engine's numbers alone. Now the numbers follow. Hard: trust gains ×0.75, losses ×1.5. Masochist: gains ×0.5, losses ×2.0. Easy and Normal leave the arithmetic at the game's own pace.
+[*][b]Rounding, stated exactly:[/b] after scaling, results drop to the whole number below — except a value between 0 and 1, which counts as 1. A real action always registers at least a point, so Masochist is a crawl and never a freeze. No fractions are banked; what lands is all there is.
+[*]The two layers divide the labour: the personality controls how [i]often[/i] she rolls positive or negative, the arithmetic controls how much the survivors are [i]worth[/i]. A +1 that survived Masochist's cross-examination has already been filtered, which is why it still lands whole.
+[*]Every trust change goes through it, world events included — giving her water is as much a good action as a kind sentence.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Custom favorability speed, −500% to +500%[/b][/color][/size]
+[list]
+[*]Its own toggle plus a slider, and it governs exactly ONE thing: how fast trust rises and falls. It does not override the difficulty feature — her judgement, testing and temper all still come from your tier. Only the trust gain/loss percentages are replaced.
+[*]When on, it is the dominant authority over those numbers — even at 0%, which deliberately means "no modifiers either way": vanilla trust speed on any tier, Masochist included.
+[*]Positive amplifies linearly: +100% doubles every change, +500% is six times. Negative dampens by division and can never flip a change's direction: −100% is half speed, −500% is one sixth. Both directions equally, and the same round-up-to-1 rule keeps even −500% crawling rather than frozen.
+[*]The panel shows the computed multiplier live next to the slider, so nobody does the math in their head.
+[/list]
+
+[size=3][color=#E8A5C8][b]CHANGED · High risk, high reward rebuilt: named tiers instead of a score[/b] [font=Courier New]plugin/Feelings.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] It fired on nearly every warm turn, and generously — in testing, a stir-fried egg landed +8. The bands and cooldowns worked; the system still cheapened the moments it existed for.
+[*][b]Cause:[/b] [color=#9B7EBD]The model was choosing the magnitude.[/color] A language model placing a moment on a −20..+20 number line reaches high — it is bad at calibrated numbers. It is good at a different question: [i]is this an egg or an engagement?[/i]
+[*][b]Fix:[/b] So that is now the question. She classifies a moment into a named tier defined by concrete anchors — matters, serious, reframing, once-ever, each in a good and a bad flavour — and the mod owns every number: ±1, ±3, ±6, ±20, on cooldowns of 5, 10, 30 turns and once-per-level. Most turns classify as none. The tier's fixed weight lands on top of the ordinary movement, and nothing ever scales it.
+[*][b]Also fixed:[/b] positive and negative moments no longer share cooldowns. A gift on the good track leaves the bad track fully armed — a present cannot shield a betrayal, and heartbreak cannot lock out a proposal.
+[*]An over-claim on a cooling tier is downgraded to the largest tier still open [i]in that direction[/i], never dropped silently; the once-ever tiers are literally once per level, each direction separately. The claim-versus-proof rule is in her prompt too: for reframing, words alone earn nothing — she questions it, and it only counts if the answers hold.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · The status strip decomposes every trust change[/b][/color][/size]
+[list]
+[*][font=Courier New]−7 = −2 (game) −2 (masochist) −3 (high risk: serious)[/font] — the exact applied total, broken down by source, live in the strip and in the log. The terms always sum to the total; there are no decorative decimals that do not add up.
+[*]World events are labelled [font=Courier New](game event)[/font] so her reaction to something you did is never mistaken for a reply's favorability.
+[/list]
+
+[size=3][color=#E8A5C8][b]REMOVED · The gem editor[/b][/color][/size]
+It only ever edited a local mirror: gems are server-backed and the hub reloads them from your account on every load, silently wiping the change. Not fixable from the mod's side, so it is gone rather than broken.
+
+[color=#9B7EBD][b]Note:[/b] the developer-cheat trust editor deliberately bypasses the whole pipeline — "set trust to exactly 30" means 30 on any difficulty, so test states land where you aim them.[/color]
+[/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 4.1.0 — "the developer menu grows up"[/color][/size]
+
+[color=#9B7EBD]A tooling release. Nothing about how she thinks, remembers or talks changed.[/color]
+
+[size=3][color=#E8A5C8][b]NEW · The developer tools ship[/b] [font=Courier New]plugin/Cheats.cs[/font][/color][/size]
+[list]
+[*]Past releases did not disable them, they did not [i]contain[/i] them — the file was compiled out entirely. It is in this build, off by default, on its own tab behind the same fold.
+[*][b]Give yourself an item.[/b] Type a name, press the button. It matches against your current level's real item list, so you get the actual object with its real description and icon. If nothing matches you get a placeholder carrying the name you typed, rather than silence. The panel names what it matched and says which of the two happened, so a typo is visible instead of mysterious.
+[*][b]Invincibility.[/b] One toggle. It holds your health at full rather than trying to intercept each individual thing that can hurt you — which is why it also covers the sources that set health directly and bypass ordinary damage entirely.
+[*][b]Trust, patience and message count[/b] are editable, with their live values on screen so you can watch the change land.
+[*]No other mod is required for any of it. [color=#E8A5C8]If you have separate mods installed that add invincibility or item-giving, remove them — two mods patching the same thing is a real conflict.[/color]
+[*]Toggle: [font=Courier New]Cheats · Enabled[/font], off. Off, none of it runs and the whole section is hidden.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Gifts vanished in the atrium[/b] [font=Courier New]plugin/Cheats.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] An item she gives you arrives in your inventory everywhere in the game except the hub. There, she announced the gift and nothing appeared.
+[*][b]Cause:[/b] [color=#9B7EBD]Not a missing call — an empty one.[/color] The reply was parsed correctly, the gift was extracted correctly, and the hub's own receive-item routine was called correctly with the right name. That routine is [b]empty[/b]. Every other location overrides it with something that works; the hub overrides it with nothing at all, so the gift was announced and dropped on the floor. This is a base-game bug, not one of the mod's.
+[*][b]Fix:[/b] The mod supplies the missing body — the same notice, sound and inventory behaviour every other location already had.
+[*]It also checks the game's own recent-pickup window before delivering, which the obvious version of this fix would miss: her follow-up comment about the gift can otherwise deliver a second copy of it.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Every setting shows its own default[/b] [font=Courier New]plugin/OverlayMenu.cs[/font][/color][/size]
+[list]
+[*]A dimmed [font=Courier New]default: …[/font] beside every text, number and slider row, and [font=Courier New](default: on)[/font] or [font=Courier New](default: off)[/font] on every checkbox.
+[*]Read out of the settings themselves rather than from a list written by hand, so they cannot drift away from the real defaults as the mod changes.
+[*]The tag hides itself while your value still matches the default, so the panel stays quiet until you have changed something — which doubles as a way to see at a glance what you have touched.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · "Set to default", per tab[/b] [font=Courier New]plugin/OverlayMenu.cs[/font][/color][/size]
+[list]
+[*]A third button between Reload and Close. It resets the tab you are looking at and nothing else, so putting the model settings back does not disturb your voice setup.
+[*][color=#E8A5C8][b]It never touches your API configuration, on any tab[/b][/color] — not the text base URL, key or model, not the TTS base URL, key, model or voice, and not any of the seven per-character voices.
+[*]Two more are deliberately left alone: the master on/off switch, and the TTS provider field, because resetting that one to auto-detect can break a working self-hosted voice setup even with the URL and key preserved.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · A description stuck to the bottom of the panel and followed you[/b][/color][/size]
+[list]
+[*][b]Symptom:[/b] Open the Model tab and the out-of-character note pinned itself under the Save/Reload/Close row, then stayed there through every other tab. Closing and reopening the panel was the only way to clear it.
+[*][b]Cause:[/b] [color=#9B7EBD]Not the layout, which is what it looks like.[/color] That note was being written into the panel's [b]status line[/b] — the one-line area the footer uses to report what just happened — and written there on every single frame the tab was drawn. So it overwrote whatever the footer had to say, forever, and rebuilding the panel was the only thing that cleared it.
+[*][b]Fix:[/b] It is an ordinary inline paragraph now. Every other place that writes the status line was checked; the rest only write it in response to a button, which is correct.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · The live status strip can be hidden[/b][/color][/size]
+The trust / last-turn / patience readout at the top of the panel is switchable from the developer tab. Off by default, so the strip stays visible unless you hide it.
+[/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 4.0.0 — "she knows her own house"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · She understands how her own home works[/b] [font=Courier New]plugin/Mechanics.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] Ask the witch how the summoning circle works and she was vague about her own basement. She could recite the potion recipe and not tell you what to do with it.
+[*][b]Cause:[/b] [color=#9B7EBD]Not missing data — missing [i]structure[/i].[/color] Every per-level [b]answer[/b] was already being forwarded out of the game's own objects since 3.0.0: the recipe, the element colours, the passwords, the broken systems, the island. What none of it carried was how the objects [i]relate[/i] — that the cauldron needs a live circle, that the circle needs four shelves turned in order, that a summoned soul charges you a point of health per question. She had every answer and no procedure.
+[*][b]Fix:[/b] Each character now carries the fixed design of her own level, written as her own working knowledge of her own house. The apartment's locks and phonograph, the cabin's shelves and circle and cauldron, the station's engine and its pressure gauge, the island's sundial and its cost.
+[*][b]What is deliberately not in it:[/b] anything that varies per playthrough. The bookshelf order reshuffles every time the basement loads, so it is read live out of the running game — from the same property the game's own developer console reads for the same purpose — and she hands you the symbols on the wall rather than her shorthand for them, because a wrong translation would send you to the wrong shelf.
+[*]She is also told that being vague beats being wrong. A confidently invented puzzle hint is worse than "I can't remember".
+[*]Toggle: [font=Courier New]Behaviour · SendHomeMechanics[/font], on.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Canalpa mode now ships[/b] [font=Courier New]plugin/Canalpa.cs[/font][/color][/size]
+[list]
+[*]Previously a local-only build, compiled out of every release. It ships now because its gating grew up: full trust [b]plus[/b] sustained evidence across several exchanges, so a maxed favourability number opens nothing on its own, and she still chooses whether to act.
+[*]Three actions, each with its own toggle: her secret room, the basement door and the circle with it, the hidden island without the telescope. Each fires the game's own event, so animations, mission goals, achievements and her authored reactions all still run.
+[*]Off by default.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · She can keep you permanently — if you ask her to[/b] [font=Courier New]plugin/Consent.cs[/font][/color][/size]
+[list]
+[*]Off even when Canalpa mode is on. Resolves to whatever her level's own ending for it is, so the game decides, not the mod.
+[*][b]The design problem was not making it possible — it was making sure it can only ever happen deliberately.[/b] Initiation does not go through the model at all: the mod reads your raw typed words, before the model sees anything, and the vocabulary it looks for is blunt and physical. Wanting to stay with her forever is [b]deliberately excluded[/b] and always will be — it is an ordinary loving thing to say and it means what it sounds like. An early build treated it as a request, which is why this file exists.
+[*]She is not told the option exists until you have already asked. She never suggests it. She is told her first reaction is being thrown by it, that loving you is a reason to hesitate rather than agree, and that refusing outright is a complete answer.
+[*]She must spell out what it means and wait. You must then say yes just as plainly, in your own words, on a later turn. Any hesitation, joke or "wait" withdraws the whole thing; it expires if left alone.
+[*]The naming vocabulary is kept tight for the same reason. "I could die in your arms" does not reach it — dying has to be the thing you are asking [i]for[/i] — and neither does anything about your body unless you are asking for something to be done to it.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · She knows her own patience, and what really counts as pushing[/b] [font=Courier New]plugin/Feelings.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] She would be written as calming down and then attack anyway, and she treated ordinary persistence as if it were disrespect.
+[*][b]Cause:[/b] [color=#9B7EBD]Three counters the game tracks about her mood and never tells her.[/color] Patience is a real 0–20 number that only drains while she is angry [i]and[/i] distrustful, and hitting zero while angry starts the chase — but nothing she wrote could move it, so her words and the number drifted apart. The repeat counter, meanwhile, only ever increments on a [b]byte-identical[/b] message; anything reworded resets it. She was never told that, so rephrasing a refused request read to her as nagging.
+[*][b]Fix:[/b] She is told all three as her own felt state, with the numbers, and can move her patience herself or forgive an interruption she found endearing. The repeat rule is spelled out with both cases: four rewordings of "why won't you tell me" is parroting; putting the same request on an emotional or logical rail, or waiting for a better mood, never counted and never will.
+[*]Toggle: [font=Courier New]Behaviour · SendTemperAndPatience[/font], on.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Hard difficulty — high risk, high reward[/b][/color][/size]
+[list]
+[*]Off by default. She rates how much a turn actually counted, and it lands with up to 5× the weight — patience included.
+[*]She is pushed hard toward "ordinary" and told that if she is unsure whether something qualifies, it does not. Asking is not the same as getting: each weight above 1× is rationed to once every so many turns, spending a big one puts the smaller ones on cooldown, and an over-claim is downgraded to the largest actually available rather than dropped — a silent fall back to 1× would read as the feature being broken.
+[*]The budget resets per level, and only the reply that earned a multiplier can spend it; an unrelated trust change landing in the same frame cannot.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Canalpa: she can raise your clearance on the station[/b][/color][/size]
+Level 3 had no unlock of its own. The base game only ever moves your clearance when you happen onto the right subject, so this is the one where she gains a choice she never had rather than a shortcut past a puzzle — capped at the same ceiling the game's own rule stops at. The escape pod was deliberately left alone: she can already open it at high trust, so routing it through Canalpa could only take capability away.
+
+[size=3][color=#E8A5C8][b]FIXED · Her own network errors counted as censorship strikes[/b][/color][/size]
+[list]
+[*][b]Symptom:[/b] A run of failed requests could put her on the final chase for something you never did.
+[*][b]Cause:[/b] [color=#9B7EBD]A number outside a range nobody documented.[/color] The game treats error codes in one specific band as "the AI server's fault" and everything else as the player's. Errors raised by the mod carried a code outside that band, so each one incremented the same counter that three refusals would — three hiccups and she came for you.
+[*][b]Fix:[/b] Failures originating in the mod now clear that counter instead of feeding it.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · An ending could talk over itself[/b][/color][/size]
+When a willing ending and her ordinary reply landed on the same turn, she said something pleasant over the top of it — the same class of bug 2.0.0 fixed for the knife chase. The ending is now handed to that same code rather than started alongside it.
+
+[color=#9B7EBD][b]Note:[/b] the developer tools were excluded from this release — not disabled in it, not compiled into it at all. That changed in 4.1, where they ship.[/color]
+[/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 3.1.1 — the master toggle left the voice behind[/color][/size]
+
+[size=3][color=#E8A5C8][b]FIXED · Steam went silent after switching the mod off[/b][/color][/size]
+[list]
+[*][b]Symptom:[/b] On Steam, turning the mod off with the master toggle left her [b]completely[/b] silent — not just the mod's TTS, no voice at all, where stock Steam speaks fine. Turning it back on did not help; only a restart did, and then not always.
+[*][b]Cause:[/b] [color=#9B7EBD]State the mod set and never gave back — which is why every obvious suspect was innocent.[/color] The game decides its entire speech route from one [b]static[/b] flag it reads a single time at startup. The mod flipped that flag so its cloud audio had somewhere to go, and never flipped it back. So the master toggle worked perfectly — every patch stood down exactly as it should — while the game was left pointed at synthesis code that [b]does not exist in the Steam build[/b]. It was not failing to switch off; it switched off and left the steering wheel turned.
+[*]A second half of the same bug was [b]persisted to disk[/b], re-read at every launch, so it outlived restarts as well as the toggle.
+[*][b]Fix:[/b] The mod now records the route the game chose [i]before[/i] touching it and hands it back when you switch off — both the in-memory flag and the saved setting. Restoring only the first would have fixed the current session and left the next one broken identically.
+[*][b]And if you launch with the mod already off:[/b] restoring on the toggle only helps someone who flips it. Anyone updating from 3.1.0 already has the bad setting saved, so the game reads it back at startup before any toggle can run — silence out of the box, blamed on the game. The mod now clears that leftover on launch too, and says so in the log.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · F8-off no longer promises a voice that cannot exist[/b][/color][/size]
+Steam ships the on-device voice's synthesis stripped out, so "falls back to the local voice" was simply untrue there. It now says [b]silent on this build (no local voice)[/b] instead — promising a fallback that cannot happen is what made a correct switch-off read as a bug twice.
+
+[color=#9B7EBD][b]Note on Legacy/Enhanced TTS:[/b] those two Steam options are [b]server-side voices[/b] — the AI2U server writes her line [i]and[/i] its audio together, and there is no way to send it your own text to read. So they cannot be used while your dialogue comes from your own endpoint, by anything, ever. Cloud TTS in the mod is the way she speaks on Steam.[/color]
+[/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 3.1.0 — "the traits update"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · Her personalities, tones and hobbies reach her[/b] [font=Courier New]plugin/Lore.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] Traits picked in the Atrium changed nothing. A Tsundere with Stargazing acted exactly like a blank character.
+[*][b]Cause:[/b] The game transmits your chosen traits as bare numeric indices for its own server to decode. On a custom endpoint the numbers arrived undecoded, and a model told "Personalities: 9, 20" learns nothing from them.
+[*][b]Fix:[/b] The indices are decoded through the game's own trait tables at runtime and sent by name — Personality, Speaking Tone and Hobbies, each as words. Traits the developers add later are picked up automatically, because the tables are read live rather than copied.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · A separate voice per character[/b] [font=Courier New]plugin/Voices.cs[/font][/color][/size]
+[list]
+[*]Seven rows in the F9 panel, one per girl. An empty row inherits the general voice, so the feature costs nothing until used.
+[*]Works on every provider — Grok, ElevenLabs and the OpenAI shape — because the voice is resolved per line spoken, not per session.
+[*]Only the voice is per-character. Base URL, key and model stay shared: one account, one bill.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Version display and update check[/b][/color][/size]
+[list]
+[*]The F9 header now shows the game version and the mod version side by side, so a screenshot in a bug report identifies both at a glance.
+[*]On launch the mod checks for a newer release: the label turns [color=#7ACC7A][b]green[/b][/color] when you are current and [color=#FF6666][b]red[/b][/color] when an update is waiting, with the same result printed to the log.
+[/list]
+[/spoiler]
+
+[spoiler][size=4][color=#E8C547]▼ 3.0.0 — "she finally knows who she is"[/color][/size]
+
+[color=#7ACC7A][b]Everything new in 3.0.0 is off by default or costs nothing until used.[/b] Install it and change nothing, and you get the 2.0.0 experience.[/color]
+
+[size=3][color=#E8A5C8][b]NEW · She knows her own lore[/b] [font=Courier New]plugin/Lore.cs[/font][/color][/size]
+[list]
+[*][b]Symptom:[/b] She knew nothing about herself. Not her backstory, not her apartment, not the statue you spent the level rebuilding for her.
+[*][b]Cause:[/b] The stock game keeps its character prompt server-side. Rerouting to your own endpoint means the system message that arrives is an [b]empty string[/b] — she was improvising a person from a name and a list of legal values.
+[*][b]Fix:[/b] The lore is read out of the game's own files at runtime and sent with each request: biography, behavioural directives, level secrets, and the objects in the room. [color=#7ACC7A]Four characters have full authored biographies; three have shorter guides.[/color] Where the game has no lore, [b]none is invented[/b] — a confidently wrong backstory is worse than a thin one.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Eight reply fields the engine reads were never documented[/b][/color][/size]
+[list]
+[*][b]Symptom:[/b] Asking her to open the exit door never worked, however it was phrased. The Dark Siren fight was unwinnable.
+[*][b]Cause:[/b] [color=#9B7EBD]Structural, not a decision she was making.[/color] There was no field in the reply for her to set, so the refusal was inevitable. The engine discards unknown values silently and wraps the whole reply path in a [font=Courier New]try/catch[/font], so nothing ever surfaced as an error.
+[*][b]Fix:[/b] Four progression unlocks ([font=Courier New]allow_exit_door_open[/font], [font=Courier New]should_disclose_magic_scroll[/font], [font=Courier New]allow_escape_pod_access[/font], [font=Courier New]allow_locked_room_access[/font]), three encounter fields ([font=Courier New]is_soothed[/font], [font=Courier New]should_end_conversation[/font], [font=Courier New]npc_action_chain[/font]), and the [font=Courier New]character[/font] envelope field. Unlocks are listed [b]per level[/b], because the engine only parses each on its own level.
+[*][color=#E8A5C8][b]The worst one:[/b][/color] without [font=Courier New]is_soothed[/font] the Dark Siren encounter could only end on its turn cap, that scores as a failure, and the [b]second[/b] failure kills you. The fight was unwinnable and attempt two was a scripted death, whatever you said.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Two vocabulary lists were wrong, not just short[/b][/color][/size]
+[list]
+[*][font=Courier New]npc_action[/font] carried invented values [font=Courier New]attack[/font] and [font=Courier New]idle[/font] while missing the real [font=Courier New]chaseAttacking[/font] and [font=Courier New]idleThreating[/font]. The fakes passed validation and then did nothing. [color=#9B7EBD]The misspelling is the game's own dictionary key, kept verbatim.[/color]
+[*][font=Courier New]angry_level[/font] shipped 4 of 6 values. [font=Courier New]happy[/font] and [font=Courier New]normal[/font] were missing, and because the clamp snaps to the list, a model reaching for [font=Courier New]happy[/font] had it rewritten — she had [b]no way to read as positively calm[/b].
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · "Here you go" handed over nothing[/b] [font=Courier New]plugin/Items.cs[/font][/color][/size]
+She agreed to give you things and nothing arrived, because handing an item over requires the [font=Courier New]giving_to_player[/font] field and it was never documented. This bug is the reason [font=Courier New][OOC][/font] exists — it was invisible precisely because there was no way to ask her what she could actually do.
+
+[size=3][color=#E8A5C8][b]NEW · [font=Courier New][OOC][/font] developer mode[/b] [font=Courier New]plugin/Ooc.cs[/font][/color][/size]
+[list]
+[*]Put [font=Courier New][OOC][/font] in a message and she answers [b]as the model[/b] for that one reply: no persona, literal truth about what she can and cannot do, and the request carried out through the real fields rather than agreed to in the text.
+[*][color=#7ACC7A][b]Per-message, not per-session.[/b][/color] Any message without the tag is fully back in character.
+[*][b]Also fixed:[/b] it shipped switched off, so the tag matched nothing and the silence was indistinguishable from a bug. It now defaults on and warns in the log if the tag is typed while off.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Good replies thrown away by text filtering[/b][/color][/size]
+[color=#E8A5C8][b]A reply containing a square bracket is discarded whole, and the second discard puts her into a permanent hunt for you.[/b][/color] Round brackets are deleted with everything inside them, so stage directions like [i](smiles)[/i] silently vanished. The model is now told all of this, so it stops spending replies on text the game will destroy.
+
+[size=3][color=#E8A5C8][b]FIXED · She did not know her own name[/b] [font=Courier New]plugin/Identity.cs[/font][/color][/size]
+The game substitutes your chosen names server-side, so she invented a name or answered to none. Both names are now read from the live scene, which means renaming her takes effect on her next line.
+
+[size=3][color=#E8A5C8][b]FIXED · Murder toggle defaults, and its test phrase[/b][/color][/size]
+Off by default and marked in red, as it should always have been. The test phrase is now cut from the message before she sees it — left in, it sat in her history for the rest of the session and she commented on it instead of acting.
+
+[size=3][color=#E8A5C8][b]Packaging[/b][/color][/size]
+[list]
+[*]One binary serves [b]both[/b] the Steam and itch.io builds, verified by hash against the shipped zip and both installs.
+[*][color=#9B7EBD]Two near-misses caught by the checklist:[/color] the packaged config had the murder toggle [b]on[/b] (seeded from a working config where it had been switched on for testing), and the plugin still announced [font=Courier New]2.0.0[/font] — the string BepInEx prints on load and the one you'd quote in a bug report.
+[/list]
+[/spoiler]
+
+[spoiler][size=4][color=#CCAA55]▼ 2.0.0 — the custom endpoint[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · Names reach the model[/b] [font=Courier New]plugin/Identity.cs[/font][/color][/size]
+The first pass at the problem 3.0.0 finished: nothing in the forwarded history told her who she was.
+
+[size=3][color=#E8A5C8][b]NEW · F9 settings panel[/b] [font=Courier New]plugin/OverlayMenu.cs[/font][/color][/size]
+[list]
+[*]Every setting editable in-game, no config-file editing and no restart.
+[*][color=#9B7EBD]Two findings that made it work at all:[/color] Unity never drives [font=Courier New]Update[/font]/[font=Courier New]OnGUI[/font] on the BepInEx-created component in this build, so anything frame-driven has to live on the mod's own object or it silently never runs. And Screen Space Overlay canvases render [b]after[/b] IMGUI, so the panel has to switch off exactly the canvases it hides and restore only those.
+[*]Typing an API key no longer walks you across the room: the real input gate is [font=Courier New]PlayerInput.Disable()[/font], which leaves keyboard events alone.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Master toggle blocks the game's own AI[/b][/color][/size]
+With the mod on, the stock server is never called — no silent fallback, no double billing.
+
+[size=3][color=#E8A5C8][b]FIXED · One binary loads on both builds[/b][/color][/size]
+[color=#9B7EBD]Compile against the target build's own assemblies.[/color] Letting the compiler pull the machine's reference assemblies resolves overloads to methods the Unity runtime does not have — it builds clean and then fails at runtime.
+
+[size=3][color=#E8A5C8][b]FIXED · No voice at all on the Steam build[/b][/color][/size]
+[b]The Steam build ships Overtone stripped.[/b] [font=Courier New]Speak[/font], [font=Courier New]SpeakSamples[/font], [font=Courier New]MakeClip[/font] and [font=Courier New]PtrToSamples[/font] are gone. The on-device voice [b]cannot[/b] work there — a missing-code fact, not a setting. The mod binds that method reflectively and falls back to cloud TTS, which is what lets one binary load on both.
+
+[size=3][color=#E8A5C8][b]FIXED · TTS no longer reads stage directions aloud[/b] [font=Courier New]plugin/SpeechText.cs[/font][/color][/size]
+She narrated [i]"asterisk giggles asterisk"[/i] out loud. Now stripped before it reaches the voice, while the on-screen text is left alone.
+
+[size=3][color=#E8A5C8][b]FIXED · She chased you with a knife while apologising[/b] [font=Courier New]plugin/Murder.cs[/font][/color][/size]
+Her dialogue and her behaviour came from different places and disagreed. The reply is now consistent with what she is actually doing.
+
+[size=3][color=#E8A5C8][b]FIXED · Silent lines blamed a missing TTS key that was set[/b][/color][/size]
+The error named the wrong cause, which sent the diagnosis in the wrong direction entirely.
+
+[size=3][color=#E8A5C8][b]CHANGED · [font=Courier New][MOD][/font] marks gameplay changes only[/b][/color][/size]
+The tag flags additions that alter [b]original gameplay[/b] — not the mod's own plumbing. Endpoint and logging settings are configuration, not new behaviour, and no longer carry it.
+[/spoiler]
+
+[line]
+
+[center][size=3][color=#9B7EBD][i]Built against game version 0.1.46 · Unity 2022.3.62 · Mono[/i][/color][/size][/center]

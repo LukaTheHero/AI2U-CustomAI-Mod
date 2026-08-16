@@ -57,12 +57,25 @@ namespace AI2UCustomAI
         const string FieldWants = "npc_wants_to_kill";
         const string FieldFinal = "npc_final_words";
 
-        // The warning shock, level 3 only. The base game has no non-lethal zap:
-        // ShockToDeathFinalChase (Main_L3.cs:369) is the ONLY shock and it is the
-        // kill, fired on the chase path when the player is already at 1 health.
-        // The played sessions show what that hole does - she threatens a zap,
-        // and then either nothing happens or the real hunt starts. This field
-        // gives the threat a real, bounded consequence instead.
+        // The warning shock, level 3 only - the DELIBERATE variant of a mechanic
+        // the base game already has.
+        //
+        // Get this right, because a shipped changelog once got it wrong: vanilla
+        // DOES have a warning zap. When her anger arithmetic crosses the
+        // discipline line, ApologyNeededCheck swaps her action to the zap attack
+        // (chaseAttacking on this level), it costs the player one point of
+        // health, and it kills only "accidentally" - when they were already at 1.
+        // That accident IS the Electrocuted ending. What made the zap look
+        // missing was our own anger-suppression bug: the model kept her at
+        // "normal" to protect the player, the engine's swap never triggered, and
+        // the whole vanilla mechanic lay dormant until the angry-thermometer
+        // rule restored it.
+        //
+        // So this field does not fill a hole. It adds the version the engine
+        // cannot do: HER choosing the jolt as discipline, on a turn of her own
+        // picking, with a hard health floor of 2 so the chosen one can never be
+        // the accident. Engine zap: forced, can kill at 1 HP. This zap: chosen,
+        // never lethal. Both exist on purpose.
         const string FieldShock = "npc_warning_shock";
 
         // Used only when the chase is starting and she wrote no FieldFinal.

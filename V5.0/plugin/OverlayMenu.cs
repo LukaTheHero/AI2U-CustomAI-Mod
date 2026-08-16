@@ -637,11 +637,11 @@ namespace AI2UCustomAI
                     + "patience number, and she can forgive a repeat or an interruption she found "
                     + "endearing instead of letting it count against you.", sub);
                 Bool(Plugin.CfgWarningShock, "She can shock as a warning (Level 3)" + ModTag);
-                GUILayout.Label("  The hologram gets a disciplinary jolt that is not the kill: her zap "
-                    + "animation plus exactly one point of your health, through the game's own damage "
-                    + "event. Only when she is genuinely angry in that same reply, and only while you "
-                    + "have at least 2 health - it cannot ever kill you. The base game's only shock "
-                    + "is the lethal one.", sub);
+                GUILayout.Label("  Lets the hologram CHOOSE her disciplinary jolt: zap animation plus "
+                    + "exactly one point of your health, through the game's own damage event. Only "
+                    + "when genuinely angry, and only while you have 2+ health - the chosen one can "
+                    + "never kill. The game's own automatic zap (forced by its anger math, lethal if "
+                    + "you were at 1 health) is untouched and still works.", sub);
 
 #if CANALPA
                 // Lives here rather than under Extra content on purpose: it

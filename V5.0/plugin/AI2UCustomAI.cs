@@ -425,13 +425,14 @@ namespace AI2UCustomAI
                 + "her numbers (see SendTemperAndPatience) but only the game's own arithmetic "
                 + "moves them.");
             CfgWarningShock = Config.Bind("Behaviour", "SheCanShockAsAWarning", true,
-                "Level 3 only. Give her a disciplinary shock that is NOT the kill: her zap animation "
-                + "plus exactly one point of your health, dealt through the game's own damage event, "
-                + "usable only when she is genuinely angry in that same reply and only while you have "
-                + "at least 2 health - so it cannot kill, ever. The base game has no such move: its "
-                + "only shock is the lethal one on the kill path, which is why she used to threaten a "
-                + "zap and then either do nothing or start the real hunt. On by default because it "
-                + "fills a hole in her authored behaviour rather than adding a new power.");
+                "Level 3 only. Let her CHOOSE a disciplinary shock: her zap animation plus exactly "
+                + "one point of your health, dealt through the game's own damage event, usable only "
+                + "when she is genuinely angry in that same reply and only while you have at least 2 "
+                + "health - so the chosen one can never kill. This is the deliberate sibling of a "
+                + "mechanic the base game already has: the engine forces the same zap automatically "
+                + "when her anger arithmetic crosses its line, and THAT one costs a point too and "
+                + "kills if you were already at 1 - which is exactly how the Electrocuted ending "
+                + "works, and it still does. This toggle adds her judgement to it, not a new power.");
             // New key name on purpose. The old BlockGameSummaryAI meant "suppress
             // these features"; this one means "run them here instead", which is the
             // opposite intent. Reusing the key would have made an existing saved

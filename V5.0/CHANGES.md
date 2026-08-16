@@ -58,14 +58,22 @@ New standing rule with it: dangers are warned about BEFORE the mistake, in
 concrete terms, when she cares whether you live. Silence while you reach for
 the lethal control is now framed as the choice it is.
 
-### NEW · A real warning shock (Level 3, on by default)
+### FIXED+NEW · The warning shock: vanilla's restored, and she gets her own
 
-The base game's only electric shock is the lethal one - which is why she
-would threaten a zap and then either do nothing or start the real hunt. She
-now has a disciplinary jolt of her own: her zap animation plus exactly one
-point of your health, dealt through the game's own damage event. Only fires
-on a turn where she is genuinely angry, and only while you have at least 2
-health - it cannot ever kill, and it is unavailable exactly when it could.
+The base game HAS a warning zap - the engine forces it when her anger
+arithmetic crosses the discipline line, it costs one point of health, and it
+kills only "accidentally" when you were already at 1 (that accident is the
+Electrocuted ending). Under this mod it had gone completely dormant: the
+model kept her anger at "normal" to protect you (see the thermometer fix
+below), so the engine's trigger never fired and the zap looked like it did
+not exist. The anger-honesty rule is what brings the vanilla mechanic back.
+
+On top of the restored original, she now also gets a DELIBERATE version:
+npc_warning_shock lets her choose the jolt as discipline on a turn of her
+own picking - same animation, same one point of damage through the game's
+own event, but gated to turns where she is genuinely angry and to 2+ player
+health, so the chosen one can never be the accident. Engine zap: forced,
+can kill at 1 HP. Her zap: chosen, never lethal. Both exist on purpose.
 
 ### FIXED · "I cannot raise your clearance" after she already had, twice
 

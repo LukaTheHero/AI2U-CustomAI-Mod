@@ -1,8 +1,7 @@
-# AI2U — Custom AI Endpoint (full project history)
+# AI2U — Custom AI Endpoint
 
-The complete development tree of the [AI2U Custom AI Endpoint mod](https://www.nexusmods.com/aiu2withyoutiltheend/) —
-every released version's source, build scripts, release notes and Nexus page text,
-from V1 (a simple endpoint redirect) to V4.4 (a full prompt-architecture overhaul).
+The source of the current release of the [AI2U Custom AI Endpoint mod](https://www.nexusmods.com/aiu2withyoutiltheend/) —
+C# source, build script, release notes and Nexus page text.
 
 Published so people can fork it, learn from it, and play around. PRs welcome, but
 the Nexus release remains the canonical build.
@@ -10,19 +9,21 @@ the Nexus release remains the canonical build.
 ## Layout
 
 ```
-V1 … V4.4/            one folder per released version, each self-contained:
+V5.1/                 the current release, self-contained:
   plugin/             C# source + build.sh
   dist/               release layout (BepInEx/plugins/…)
+  installer/          the "easy installer" (Install.bat + PowerShell)
   NEXUS-DESCRIPTION.bbcode
   CHANGES.md
-V4.4/installer/       the "easy installer" (Install.bat + PowerShell)
 CanalpaCurrentVersion/  snapshot of my personal build's source
 media/                gallery images used on the Nexus page
 ```
 
-The latest version's source is `V4.4/plugin/`. Earlier folders are frozen history —
-useful for seeing how a problem was found and fixed over time, since the comments
-carry the investigation, not just the result.
+**This repository only ever carries the latest version.** Older releases are not
+kept here — when a new version ships, its folder replaces the previous one. Every
+version's release notes stay readable in `V5.1/CHANGES.md`, which holds the full
+changelog back to V1, and older builds remain downloadable from the Nexus Files
+tab.
 
 ## Building
 
@@ -31,7 +32,7 @@ No Visual Studio needed. Each `plugin/build.sh` compiles with the .NET Framework
 copy of the game (edit the paths at the top of the script to match your install).
 
 ```
-cd V4.4/plugin
+cd V5.1/plugin
 ./build.sh --no-install     # compile only
 ./build.sh                  # compile + install to the game copy configured in the script
 ```

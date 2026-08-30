@@ -58,19 +58,19 @@ Bug reports and "it broke on version X" posts are genuinely welcome.[/color][/si
 [*][color=#9B7EBD][b][color=#E8A5C8]Window Corner Resizing & 40% Larger Default View.[/color][/b] Click and drag the bottom-right corner grip ([font=Courier New]◢[/font]) to freely resize the mod menu to any dimension on any monitor. The default menu canvas is now 40% larger for crystal-clear readability.[/color]
 [*][color=#9B7EBD][b][color=#E8A5C8]Easy URL Quick Presets (with Astropond).[/color][/b] Instant 1-click endpoint presets for OpenRouter, OpenAI, DeepSeek, Groq, Astropond ([font=Courier New]https://astropond.com/v1[/font]), Ollama, LM Studio, and LinkAPI.[/color]
 [*][color=#9B7EBD][b][color=#E8A5C8]Dedicated Fetch Models & OpenRouter Provider Routing.[/color][/b] Added a dedicated [b][color=#7ACC7A]↻ Fetch Models[/color][/b] button next to Model selection. When using OpenRouter, you can now inspect and lock in specific provider routes per model, or disable fallbacks.[/color]
-[*][color=#9B7EBD][b][color=#E8A5C8]Restored Authentic Game Voices (100% Offline, Zero Key Required).[/color][/b] Full support for authentic local voice synthesis using the game's built-in Overtone engine, plus cloud TTS for custom Azure / xAI / ElevenLabs voices.[/color]
+[*][color=#9B7EBD][b][color=#E8A5C8]Offline Local Speech & Cloud Voice Support.[/color][/b] Built-in local Overtone voice engine works 100% offline with zero keys, alongside full support for high-quality neural cloud voices via Azure Speech, xAI Grok, ElevenLabs, and OpenAI.[/color]
 [/list]
 
 [line]
 
-[size=5][color=#D291BC]■ New in 5.3 — Original Game Voices Restored (100% Offline, Zero Key Required)[/color][/size]
+[size=5][color=#D291BC]■ The Voice Situation — Offline Local Fallback vs. Neural Cloud Voices[/color][/size]
 
-[size=4][color=#9B7EBD]Restored the game's authentic on-device voice engine (Overtone) across both Steam and itch.io with zero configuration and zero API keys.[/color][/size]
+[size=4][color=#9B7EBD]An honest breakdown of how speech works when using your own AI model:[/color][/size]
 
 [list]
-[*][color=#9B7EBD][b][color=#E8A5C8]Original Character Voices Restored.[/color][/b] Amy for Eddie/Evie/Eiona, Cori for Elysia, HFC Female for Estelle, and Cori-Ghost for the Magic Circle all speak out loud locally in real time while your custom LLM generates dialogue.[/color]
-[*][color=#9B7EBD][b][color=#E8A5C8]100% Offline & Free.[/color][/b] Runs directly on your PC with zero API keys or external billing required on both Steam and itch.io builds.[/color]
-[*][color=#9B7EBD][b][color=#E8A5C8]Microsoft Azure Speech Support.[/color][/b] Added direct support for Azure neural TTS alongside xAI Grok and ElevenLabs for crystal-clear custom voice synthesis.[/color]
+[*][color=#9B7EBD][b][color=#FF4444]Why the developer's server voice can't be used:[/color][/b] The vanilla game's high-end expressive voices are rendered directly on AlterStaff's own servers in the exact same packet as their AI text. Because their servers do not accept custom text to voice, routing dialogue to your own LLM means their server-side voice is impossible to call.[/color]
+[*][color=#9B7EBD][b][color=#E8A5C8]Offline Local Fallback (Overtone — 100% Offline & Free):[/color][/b] The game includes a rudimentary on-device speech synthesizer (Overtone). In 5.3 we restored native bindings so it works on both Steam and itch.io out of the box with zero API keys. It is a robotic, basic offline fallback — functional if you want zero setup, but not what you want if you care about voice quality.[/color]
+[*][color=#9B7EBD][b][color=#7ACC7A]Neural Cloud TTS (The Good Voices — Azure, Grok, ElevenLabs):[/color][/b] This is how she actually sounds great. Plug in [b]Microsoft Azure Speech[/b] (supports free Azure accounts with 500k free chars/month!), [b]xAI Grok[/b] ([font=Courier New]iris[/font]), or [b]ElevenLabs[/b] in the Voice tab for natural, emotive character voices.[/color]
 [/list]
 
 [line]
@@ -400,15 +400,15 @@ Models I have run successfully:
 
 [line]
 
-[size=5][color=#D291BC]■ Voice: Authentic Offline Voices & Cloud TTS[/color][/size]
+[size=5][color=#D291BC]■ Voice: Offline Local Fallback & Neural Cloud TTS[/color][/size]
 
-[color=#9B7EBD]As of 5.3, the authentic original game voice (Overtone) is restored and works [b]100% offline[/b] on both Steam and itch.io out of the box with zero API keys required. If you want ultra-high quality neural voices, cloud TTS can be enabled in the [b]Voice[/b] tab with a custom API key from Azure, xAI Grok, ElevenLabs, or OpenAI.[/color]
+[color=#9B7EBD]The vanilla game's high-end server voice generates on AlterStaff's server alongside their LLM, so it cannot be used with custom AI text. Instead, you have two options: a free basic on-device offline voice, or neural cloud voices (Azure, Grok, ElevenLabs) which sound amazing.[/color]
 
 [list]
-[*][b][color=#E8A5C8]Original Local Engine (Overtone)[/color][/b] — [color=#7ACC7A][b]100% offline, 0 keys, free[/b][/color] — authentic character voices (Amy, Cori, HFC Female, Cori-Ghost).
-[*][b][color=#E8A5C8]Microsoft Azure Speech[/color][/b] — [font=Courier New]https://<region>.tts.speech.microsoft.com/cognitiveservices/v1[/font] — voice like [font=Courier New]en-US-AvaMultilingualNeural[/font] — [color=#7ACC7A][b]TESTED, crystal-clear & fast[/b][/color]
-[*][b][color=#E8A5C8]xAI (Grok)[/color][/b] — [font=Courier New]https://api.x.ai/v1[/font] — voice [font=Courier New]iris[/font], 26 built-in voices — [color=#7ACC7A][b]TESTED, what I use[/b][/color]
-[*][b][color=#E8A5C8]ElevenLabs[/color][/b] — [font=Courier New]https://api.elevenlabs.io/v1[/font] — a voice ID from your Voices page — [color=#7ACC7A][b]TESTED, better but pricier[/b][/color]
+[*][b][color=#E8A5C8]Offline Local Engine (Overtone)[/color][/b] — [color=#7ACC7A][b]100% offline, 0 keys, free[/b][/color] — basic on-device speech synthesizer (Amy, Cori, HFC Female). Functional, but robotic.
+[*][b][color=#E8A5C8]Microsoft Azure Speech[/color][/b] — [font=Courier New]https://<region>.tts.speech.microsoft.com/cognitiveservices/v1[/font] — voice like [font=Courier New]en-US-AvaMultilingualNeural[/font] — [color=#7ACC7A][b]RECOMMENDED, free tier available (500k chars/mo), crystal-clear & fast[/b][/color]
+[*][b][color=#E8A5C8]xAI (Grok)[/color][/b] — [font=Courier New]https://api.x.ai/v1[/font] — voice [font=Courier New]iris[/font], 26 built-in voices — [color=#7ACC7A][b]TESTED, expressive & affordable[/b][/color]
+[*][b][color=#E8A5C8]ElevenLabs[/color][/b] — [font=Courier New]https://api.elevenlabs.io/v1[/font] — a voice ID from your Voices page — [color=#7ACC7A][b]TESTED, best quality & emotion, costs more[/b][/color]
 [*][b][color=#E8A5C8]OpenAI-compatible[/color][/b] — [font=Courier New]https://api.openai.com/v1[/font] — that provider's voice name — [color=#CCAA55][b]implemented[/b][/color]
 [/list]
 
@@ -616,18 +616,17 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [/list]
 [/spoiler]
 
-[spoiler][size=4][color=#7ACC7A]▼ 5.3.0 — "the original game voices restored offline"[/color][/size]
+[spoiler][size=4][color=#7ACC7A]▼ 5.3.0 — "offline local fallback & Azure speech"[/color][/size]
 
-[size=3][color=#E8A5C8][b]NEW · Authentic on-device voices restored (100% offline, 0 API keys)[/b] [font=Courier New]plugin/Voices.cs[/font][/color][/size]
+[size=3][color=#E8A5C8][b]NEW · Offline Local Voice Fallback (Overtone — 100% Offline, 0 API Keys)[/b] [font=Courier New]plugin/Voices.cs[/font][/color][/size]
 [list]
-[*][color=#9B7EBD]Directly restored the game's authentic Overtone voice engine on both Steam and itch.io builds.[/color]
-[*][color=#9B7EBD]Original character voices (Amy, Cori, HFC Female, Cori-Ghost) synthesize natively on your PC while your custom LLM writes dialogue.[/color]
-[*][color=#9B7EBD]Zero API keys, zero setup, and zero internet connection required for voice playback.[/color]
+[*][color=#9B7EBD]Restored native bindings to the game's built-in on-device synthesizer (Overtone) across both Steam and itch.io.[/color]
+[*][color=#9B7EBD]Provides a 100% offline, zero-key fallback for all characters without needing internet or external accounts.[/color]
 [/list]
 
 [size=3][color=#E8A5C8][b]NEW · Microsoft Azure Neural TTS Support[/b][/color][/size]
 [list]
-[*][color=#9B7EBD]Direct integration with Microsoft Azure Speech Services for high-quality custom neural cloud voices.[/color]
+[*][color=#9B7EBD]Direct integration with Microsoft Azure Speech Services for crystal-clear neural cloud voices (supports Microsoft's free 500k char/month tier).[/color]
 [/list]
 
 [size=3][color=#E8A5C8][b]REMOVED · Dead server-voice fallback toggle[/b][/color][/size]

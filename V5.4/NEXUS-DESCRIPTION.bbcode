@@ -63,6 +63,18 @@ Bug reports and "it broke on version X" posts are genuinely welcome.[/color][/si
 
 [line]
 
+[size=5][color=#D291BC]■ New in 5.3 — Original Game Voices Restored (100% Offline, Zero Key Required)[/color][/size]
+
+[size=4][color=#9B7EBD]Restored the game's authentic on-device voice engine (Overtone) across both Steam and itch.io with zero configuration and zero API keys.[/color][/size]
+
+[list]
+[*][color=#9B7EBD][b][color=#E8A5C8]Original Character Voices Restored.[/color][/b] Amy for Eddie/Evie/Eiona, Cori for Elysia, HFC Female for Estelle, and Cori-Ghost for the Magic Circle all speak out loud locally in real time while your custom LLM generates dialogue.[/color]
+[*][color=#9B7EBD][b][color=#E8A5C8]100% Offline & Free.[/color][/b] Runs directly on your PC with zero API keys or external billing required on both Steam and itch.io builds.[/color]
+[*][color=#9B7EBD][b][color=#E8A5C8]Microsoft Azure Speech Support.[/color][/b] Added direct support for Azure neural TTS alongside xAI Grok and ElevenLabs for crystal-clear custom voice synthesis.[/color]
+[/list]
+
+[line]
+
 [size=5][color=#D291BC]■ New in 5.1 — the forever level actually works now[/color][/size]
 
 [size=4][color=#9B7EBD]A full playthrough of the secret level on a custom endpoint surfaced a set of bugs that vanilla's server had been quietly covering — plus two long-standing base-game bugs the mod now fixes for everyone.[/color][/size]
@@ -318,9 +330,7 @@ This is what I actually run. It sounds great and it is the cheaper of the two.
 [*][color=#E8A5C8][b]A model that can actually hold a large prompt[/b][/color] — see the model requirements above. Since 4.4 this is a real requirement, not a preference: small local models will not hold the format.
 [/list]
 
-[color=#7ACC7A][b]Steam and itch.io are both supported by this one file.[/b][/color] The two releases of the game are not identical assemblies, but the mod works out which one it is running on at startup and adapts. Nothing to pick at install time, no separate Steam download.
-
-[color=#9B7EBD]One difference between them, and the mod prints which you have in the log: Steam's copy of the game had Overtone's speech synthesis stripped out by Unity, so [b]on Steam she needs a cloud voice provider to speak at all[/b]. Text, actions, memory and the F9 panel are identical on both.[/color]
+[color=#7ACC7A][b]Steam and itch.io are both fully supported by this one file.[/b][/color] The two releases of the game are not identical assemblies, but the mod automatically detects which one it is running on at startup and adapts. As of 5.3, the authentic on-device voice engine (Overtone) works 100% offline out-of-the-box on [b]both Steam and itch.io[/b] with zero API keys needed. Nothing to pick at install time, no separate download.
 
 [color=#9B7EBD][b]Note:[/b] BepInEx is [b]not bundled[/b] with this mod. It is a separate project with its own licence, so you grab it yourself. One extra step, takes a minute.[/color]
 
@@ -354,17 +364,15 @@ That one file is the whole mod. Its config file is written for you the first tim
 [color=#E8A5C8][b]Updating from an earlier version:[/b][/color] replace the [font=Courier New].dll[/font] and leave your config alone. Your endpoint, key and voice settings are all in there and any new settings get added on launch.
 
 [size=4][color=#9B7EBD]4. Set it up in-game[/color][/size]
-Launch the game and press [b][color=#E8C547]F9[/color][/b]. That opens the mod's own settings panel — it works in the main menu, in the hub, or mid-conversation. Fill in three fields:
+Launch the game and press [b][color=#E8C547]F9[/color][/b]. That opens the mod's settings panel — works in the main menu, in the hub, or mid-conversation:
 
 [list]
-[*][b]Base URL[/b] — [font=Courier New]https://openrouter.ai/api/v1[/font]
-[*][b]API key[/b] — from [url=https://openrouter.ai/keys]openrouter.ai/keys[/url], starts with [font=Courier New]sk-or-v1-[/font]
-[*][b]Model[/b] — [font=Courier New]google/gemini-3.6-flash[/font]
+[*][color=#9B7EBD][b][color=#E8A5C8]Profiles (Profile 1, 2, 3):[/color][/b] Switch between three independent configuration profiles directly at the top of the Setup tab. Each profile independently remembers your endpoints, models, voices, keys, and game options.[/color]
+[*][color=#9B7EBD][b][color=#E8A5C8]Easy URL Quick Presets:[/color][/b] Click [b]OpenRouter[/b], [b]OpenAI[/b], [b]DeepSeek[/b], [b]Groq[/b], [b]Astropond[/b], [b]Ollama[/b], [b]LM Studio[/b], or [b]LinkAPI[/b] to fill the Base URL instantly.[/color]
+[*][color=#9B7EBD][b][color=#E8A5C8]Model Selection & ↻ Fetch Models:[/color][/b] Enter your API key and click [b][color=#7ACC7A]↻ Fetch Models[/color][/b] to pull live available models into the searchable dropdown.[/color]
 [/list]
 
-Press [b]Save[/b]. [color=#7ACC7A][b]Changes apply immediately[/b][/color] — no restart, and you can swap models mid-conversation.
-
-[color=#9B7EBD]No config file editing required. Every setting lives in the F9 panel, on both builds.[/color]
+[color=#9B7EBD]Press [b]Save[/b]. [color=#7ACC7A][b]Changes apply immediately[/b][/color] — no restart required, and you can swap models or profiles mid-conversation. You can also drag the bottom-right corner grip ([font=Courier New]◢[/font]) to freely resize the menu window.[/color]
 
 [line]
 
@@ -392,18 +400,16 @@ Models I have run successfully:
 
 [line]
 
-[size=5][color=#D291BC]■ Optional: the good voice[/color][/size]
+[size=5][color=#D291BC]■ Voice: Authentic Offline Voices & Cloud TTS[/color][/size]
 
-The built-in local voice is functional but rough — and on the [b]Steam[/b] build it is not available at all, so a cloud voice is the only way she speaks there. Press [b]F9[/b] and open the [b]Voice[/b] section for four fields: [b]Voice API URL[/b], [b]Voice API key[/b] (a [i]separate[/i] key from your text one), [b]Voice model[/b], and [b]Voice[/b].
-
-Press [b]Test Voice[/b] — it synthesizes a line and [b]plays it out loud[/b], so you hear the voice before committing. Then set the voice dropdown to [font=Courier New]MODDED: <voice> (cloud)[/font] to enable it.
-
-[color=#9B7EBD]The request shape is [b]auto-detected from the URL[/b]. You never configure which provider is which.[/color]
+[color=#9B7EBD]As of 5.3, the authentic original game voice (Overtone) is restored and works [b]100% offline[/b] on both Steam and itch.io out of the box with zero API keys required. If you want ultra-high quality neural voices, cloud TTS can be enabled in the [b]Voice[/b] tab with a custom API key from Azure, xAI Grok, ElevenLabs, or OpenAI.[/color]
 
 [list]
+[*][b][color=#E8A5C8]Original Local Engine (Overtone)[/color][/b] — [color=#7ACC7A][b]100% offline, 0 keys, free[/b][/color] — authentic character voices (Amy, Cori, HFC Female, Cori-Ghost).
+[*][b][color=#E8A5C8]Microsoft Azure Speech[/color][/b] — [font=Courier New]https://<region>.tts.speech.microsoft.com/cognitiveservices/v1[/font] — voice like [font=Courier New]en-US-AvaMultilingualNeural[/font] — [color=#7ACC7A][b]TESTED, crystal-clear & fast[/b][/color]
 [*][b][color=#E8A5C8]xAI (Grok)[/color][/b] — [font=Courier New]https://api.x.ai/v1[/font] — voice [font=Courier New]iris[/font], 26 built-in voices — [color=#7ACC7A][b]TESTED, what I use[/b][/color]
 [*][b][color=#E8A5C8]ElevenLabs[/color][/b] — [font=Courier New]https://api.elevenlabs.io/v1[/font] — a voice ID from your Voices page — [color=#7ACC7A][b]TESTED, better but pricier[/b][/color]
-[*][b][color=#E8A5C8]OpenAI-compatible[/color][/b] — [font=Courier New]https://api.openai.com/v1[/font] — that provider's voice name — [color=#CCAA55][b]implemented, untested by me[/b][/color]
+[*][b][color=#E8A5C8]OpenAI-compatible[/color][/b] — [font=Courier New]https://api.openai.com/v1[/font] — that provider's voice name — [color=#CCAA55][b]implemented[/b][/color]
 [/list]
 
 [spoiler][b]xAI's 26 voices:[/b] carina, zagan, helix, orion, luna, [b]iris[/b], altair, zenith, perseus, helios, lux, kepler, rigel, cosmo, celeste, ursa, sirius, lumen, castor, naksh, atlas, ara, eve, leo, rex, sal[/spoiler]
@@ -418,12 +424,12 @@ Voice [b]Library[/b] voices need a [b]paid[/b] ElevenLabs plan when used via the
 
 Their own built-in voices work free: [b]Sarah[/b] [font=Courier New]EXAVITQu4vr4xnSDxMaL[/font] or [b]Lily[/b] [font=Courier New]pFZP5JQG7iQjIQuC4Bku[/font]. Use one of their model names: [font=Courier New]eleven_multilingual_v2[/font], [font=Courier New]eleven_turbo_v2_5[/font], or [font=Courier New]eleven_v3[/font].
 
-[size=4][color=#9B7EBD]Turning voice off to stop billing[/color][/size]
-Press [b]F8[/b] in-game, or set the dropdown back to [font=Courier New]MODDED: local voice (free)[/font].
+[size=4][color=#9B7EBD]Turning cloud voice off / switching back to local[/color][/size]
+Press [b]F8[/b] in-game, or switch back to the original engine in the Voice tab.
 
 [list]
-[*][b]Off[/b] — cloud billing stops the instant you switch. On itch.io she keeps talking with the free on-device voice; on Steam that voice does not exist, so she goes silent until you switch a cloud provider back on.
-[*][b]On[/b] — the good voice is back, and so is the meter.
+[*][color=#9B7EBD][b]Local Voice (Default)[/b] — cloud billing stops instantly, and she speaks with the authentic original game voice (100% offline).[/color]
+[*][color=#9B7EBD][b]Cloud Voice[/b] — neural speech synthesis via Azure, Grok, ElevenLabs, or OpenAI.[/color]
 [/list]
 
 Your choice is saved and survives a restart.
@@ -580,6 +586,55 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [size=5][color=#D291BC]■ Changelog[/color][/size]
 
 [color=#9B7EBD]All releases in full, collapsed. Each entry says what was visibly wrong, what was actually happening underneath, and what changed — the middle one is the part worth reading, because the obvious explanation was wrong more often than not.[/color]
+
+[spoiler][size=4][color=#7ACC7A]▼ 5.4.0 — "profiles, resizable UI, easy URLs & OpenRouter provider routing"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · Configuration Profiles (Profile 1, Profile 2, Profile 3)[/b] [font=Courier New]plugin/Config.cs[/font][/color][/size]
+[list]
+[*][color=#9B7EBD]Added 1-click [b]Profile 1[/b], [b]Profile 2[/b], and [b]Profile 3[/b] switching buttons directly at the top of the Setup tab.[/color]
+[*][color=#9B7EBD]Each profile independently remembers your entire configuration — endpoints, keys, chosen models, provider routes, voice engines, local model mode, and game balance tweaks. Switch between an OpenRouter setup and a local LM Studio/Ollama build in one click.[/color]
+[*][color=#9B7EBD]Active profile indicator highlights your selected profile in real time.[/color]
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Resizable Mod Menu & 40% Larger Default View[/b] [font=Courier New]plugin/OverlayMenu.cs[/font][/color][/size]
+[list]
+[*][color=#9B7EBD]The mod window is now 40% larger by default for crystal-clear readability and comfortable navigation.[/color]
+[*][color=#9B7EBD]Added an interactive bottom-right resize grip handle ([font=Courier New]◢[/font]) to freely drag and resize the menu overlay to any resolution.[/color]
+[*][color=#9B7EBD]Clean vertical scrolling with adaptive layout prevents UI elements from hiding or overflowing.[/color]
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Quick Easy URL Presets (with Astropond)[/b][/color][/size]
+[list]
+[*][color=#9B7EBD]Added 1-click Easy URL buttons: [b]OpenRouter[/b], [b]OpenAI[/b], [b]DeepSeek[/b], [b]Groq[/b], [b]Astropond[/b] ([font=Courier New]https://astropond.com/v1[/font]), [b]Ollama[/b], [b]LM Studio[/b], and [b]LinkAPI[/b].[/color]
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Dedicated ↻ Fetch Models & OpenRouter Provider Routing[/b][/color][/size]
+[list]
+[*][color=#9B7EBD]Added a dedicated [b][color=#7ACC7A]↻ Fetch Models[/color][/b] button next to Model selection that pulls available models live from any endpoint.[/color]
+[*][color=#9B7EBD]When using OpenRouter, dynamic provider routing lets you fetch, inspect, and select specific providers per model, or disable fallbacks.[/color]
+[*][color=#9B7EBD]Added transparent placeholder search hints on search and key fields for improved visibility.[/color]
+[/list]
+[/spoiler]
+
+[spoiler][size=4][color=#7ACC7A]▼ 5.3.0 — "the original game voices restored offline"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · Authentic on-device voices restored (100% offline, 0 API keys)[/b] [font=Courier New]plugin/Voices.cs[/font][/color][/size]
+[list]
+[*][color=#9B7EBD]Directly restored the game's authentic Overtone voice engine on both Steam and itch.io builds.[/color]
+[*][color=#9B7EBD]Original character voices (Amy, Cori, HFC Female, Cori-Ghost) synthesize natively on your PC while your custom LLM writes dialogue.[/color]
+[*][color=#9B7EBD]Zero API keys, zero setup, and zero internet connection required for voice playback.[/color]
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Microsoft Azure Neural TTS Support[/b][/color][/size]
+[list]
+[*][color=#9B7EBD]Direct integration with Microsoft Azure Speech Services for high-quality custom neural cloud voices.[/color]
+[/list]
+
+[size=3][color=#E8A5C8][b]REMOVED · Dead server-voice fallback toggle[/b][/color][/size]
+[list]
+[*][color=#9B7EBD]Removed the legacy server TTS toggle that could only produce silence on custom endpoints; replaced by the true offline Overtone engine.[/color]
+[/list]
+[/spoiler]
 
 [spoiler][size=4][color=#7ACC7A]▼ 5.1.0 — "the forever level"[/color][/size]
 

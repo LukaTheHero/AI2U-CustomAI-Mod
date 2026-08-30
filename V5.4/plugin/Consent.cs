@@ -39,9 +39,12 @@
 // nothing that a plain "yes" two turns later can finish, because the yes has to
 // be about the same thing in the same terms.
 //
-// All five, plus the trust and probe gates in Canalpa.cs, and the toggle, which
-// is off by default. A false positive here costs the player their run, so every
-// condition is necessary and none of them is a dial.
+// All five, plus the level/toggle reality checks in Canalpa.cs, and the toggle,
+// which is off by default. (The trust floor and probe counter that used to sit
+// on top were retired in 4.2.2 - her judgement replaced them - but nothing in
+// THIS file moved: the player's own words remain the gate her word cannot
+// open.) A false positive here costs the player their run, so every condition
+// is necessary and none of them is a dial.
 using System;
 using System.Text;
 

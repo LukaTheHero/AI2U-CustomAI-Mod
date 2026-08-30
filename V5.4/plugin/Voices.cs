@@ -118,11 +118,16 @@ namespace AI2UCustomAI
         // The voice for whoever is speaking right now, or the general one.
         public static string Current()
         {
+            return Resolve(Identity.CharacterId());
+        }
+
+        // Resolves the voice for a specific character ID, falling back to general voice.
+        public static string Resolve(int? id)
+        {
             string general = Plugin.CfgGrokVoiceId == null ? "" : Plugin.CfgGrokVoiceId.Value;
 
             try
             {
-                int? id = Identity.CharacterId();
                 if (!id.HasValue) return general;
 
                 Type t = HarmonyLib.AccessTools.TypeByName("Character");

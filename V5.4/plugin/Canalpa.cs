@@ -788,9 +788,10 @@ namespace AI2UCustomAI
         // behaviour (Main_L3.cs:817) is the same asset the manager subscribed to.
         //
         // Invoked reflectively because the second parameter is a game-assembly enum
-        // this file cannot name in a cast. +1 per grant, counted against
-        // ClearanceGrantCap in AlreadyDone, so she cannot hand out unlimited
-        // clearance in a single conversation.
+        // this file cannot name in a cast. +1 per grant. The grant counter is kept
+        // for the log only - the two-grant cap it used to enforce was retired in
+        // 5.0 (see the note on _clearanceGrants: a spent invisible allowance had
+        // her truthfully denying the ability over OOC).
         static bool RaiseClearance()
         {
             object beh = Murder.BehaviourObject();

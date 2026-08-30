@@ -436,13 +436,20 @@ namespace AI2UCustomAI
 
         // Synthesizes a short line and plays it, so the button proves the whole
         // path rather than just that the endpoint answered.
+        //
+        // Tests whichever provider would actually speak: the original-game-voices
+        // feature when its toggle is on, the cloud provider otherwise. Testing
+        // the cloud shape while the game voices are what will really run would
+        // report a green "Works!" about a path she never takes.
         internal static IEnumerator RunVoiceTest(Action<string, Color> report)
         {
             if (_vTest != null) _vTest.interactable = false;
             ReportVoice(report, "Testing...", Color.white);
             SaveVoiceFields();
 
-            if (string.IsNullOrEmpty(Plugin.CfgGrokApiKey.Value))
+            bool gameVoice = Plugin.CfgGameVoice != null && Plugin.CfgGameVoice.Value;
+
+            if (!gameVoice && string.IsNullOrEmpty(Plugin.CfgGrokApiKey.Value))
             {
                 ReportVoice(report, "No key", Color.red);
                 if (_vTest != null) _vTest.interactable = true;
@@ -450,22 +457,26 @@ namespace AI2UCustomAI
             }
 
             AudioClip clip = null;
-            IEnumerator call = GrokTts.Synthesize(
-                "Hey. This is how I will sound.",
-                delegate(AudioClip c) { clip = c; });
+            IEnumerator call = gameVoice
+                ? GameTts.Synthesize("Hey. This is how I will sound.",
+                    delegate(AudioClip c) { clip = c; })
+                : GrokTts.Synthesize("Hey. This is how I will sound.",
+                    delegate(AudioClip c) { clip = c; });
             while (call.MoveNext()) yield return call.Current;
 
             if (clip == null)
             {
-                ReportVoice(report, GrokTts.FailureLabel(), Color.red);
+                ReportVoice(report, gameVoice ? GameTts.FailureLabel() : GrokTts.FailureLabel(),
+                    Color.red);
                 Plugin.Log.LogWarning("Voice test failed - see the lines above for the endpoint's reply.");
             }
             else
             {
                 AudioSource src = UnityEngine.Object.FindObjectOfType<AudioSource>();
                 if (src != null) src.PlayOneShot(clip);
-                ReportVoice(report, "Works!", Color.green);
-                Plugin.Log.LogInfo("Voice test succeeded (" + clip.length.ToString("0.0") + "s).");
+                ReportVoice(report, gameVoice ? "Works! (game voice)" : "Works!", Color.green);
+                Plugin.Log.LogInfo("Voice test succeeded (" + clip.length.ToString("0.0") + "s, "
+                    + (gameVoice ? "game voices" : "cloud provider") + ").");
             }
 
             if (_vTest != null) _vTest.interactable = true;
@@ -601,6 +612,7 @@ namespace AI2UCustomAI
                 root["model"] = Plugin.CfgModel.Value;
                 root["messages"] = msgs;
                 root["max_tokens"] = 2000;
+                Plugin.ApplyOpenRouterParams(root);
 
                 UnityWebRequest req = new UnityWebRequest(url, "POST");
                 req.uploadHandler = new UploadHandlerRaw(

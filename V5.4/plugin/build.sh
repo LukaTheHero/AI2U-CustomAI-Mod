@@ -156,10 +156,10 @@ rm -f AI2UCustomAI_new.dll
   -r:"$MANAGED/Unity.TextMeshPro.dll" \
   -r:"$MANAGED/Unity.InputSystem.dll" \
   -r:"$MANAGED/Newtonsoft.Json.dll" \
-  AI2UCustomAI.cs GameVocab.cs GrokTts.cs Identity.cs NewInput.cs ModUI.cs \
+  AI2UCustomAI.cs GameVocab.cs GrokTts.cs GameTts.cs Identity.cs NewInput.cs ModUI.cs \
   OverlayMenu.cs ApiGuard.cs SpeechText.cs Platform.cs Murder.cs Items.cs Ooc.cs \
   Lore.cs Bios.cs Voices.cs Mechanics.cs Feelings.cs Difficulty.cs Extras.cs Roleplay.cs \
-  Unstuck.cs FinalDoors.cs \
+  Unstuck.cs FinalDoors.cs ProfileManager.cs \
   $CANALPA_SRC $PRIVATE_SRC 2>&1 | grep -v 'warning CS1701\|previous warning' || true
 
 if [ ! -f AI2UCustomAI_new.dll ]; then

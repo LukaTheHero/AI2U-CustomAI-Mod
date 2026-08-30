@@ -1,5 +1,105 @@
 # AI2U — Custom AI Endpoint
 
+## 5.4.0 — Profiles, Resizable UI, Easy URLs & OpenRouter Provider Routing
+
+Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64
+
+### NEW · Configuration Profiles (Profile 1, Profile 2, Profile 3)
+- Added 1-click **Profile 1**, **Profile 2**, and **Profile 3** buttons at the top of the **Setup** tab.
+- Profiles remember **all** settings across the mod (API base URLs, keys, models, providers, voices, local model mode, and game tweaks).
+- Switch between completely different AI setups (e.g. OpenRouter Gemini vs. local DeepSeek) in a single click with real-time active indicators (`● Profile 1`).
+
+### NEW · Resizable Mod Menu & 40% Larger Default View
+- The mod window is now **40% larger by default** (`1176 × 924`) for a clean, spacious layout.
+- Added an interactive resize grip handle (`◢`) in the bottom-right corner — click and drag to resize the mod overlay to any dimension.
+- Clean vertical scrolling ensures natural word-wrapping across all tabs.
+
+### NEW · Quick Easy URL Presets (with Astropond)
+- Added one-click **Easy URL** preset buttons on the Setup tab:
+  `OpenRouter`, `OpenAI`, `DeepSeek`, `Groq`, `Astropond` (`https://astropond.com/v1`), `Ollama`, `LM Studio`, and `LinkAPI`.
+
+### NEW · Dedicated `↻ Fetch Models` & OpenRouter Model Providers
+- Added an explicit **`↻ Fetch Models`** button right next to the Model input field, alongside the model search dropdown.
+- Dynamic per-model OpenRouter provider routing: fetch live supported providers per model, select preferred providers, or disable fallbacks.
+- Transparent placeholder hints on search and key fields for seamless navigation.
+
+## 5.3.0 — the original game voices, while your model does the writing
+
+Built against game version 0.1.46 · verified against the 2026-08-19 Steam
+update · Unity 2022.3.62 · Mono · Windows x64
+
+### NEW · Her original local voice is back — 100% offline, 0 API keys required
+
+Since 1.0.0 this mod has carried the same disclaimer: use a custom endpoint,
+lose her voice. The game's own text-to-speech was previously considered
+unreachable without external services.
+
+In 5.3, the mod directly restores the game's authentic on-device voice engine:
+**Overtone**. By directly binding to the game's included native binaries and
+voice assets (`en-us-amy-medium`, `en-gb-cori-high`, `en-us-hfc_female-medium`),
+the original character voices (Amy for Eddie/Evie/Eiona, Cori for Elysia,
+HFC Female for Estelle, Cori-Ghost for Magic Circle) work natively on BOTH
+Steam and itch.io builds with **zero API keys**, **zero setup**, and **zero
+internet connection required**.
+
+Simply leave **"Use the ORIGINAL game's TTS engine"** turned on (default)
+in the Voice tab, and she speaks out loud in real time while your custom LLM
+writes her lines! If you prefer neural cloud voices (xAI / ElevenLabs / OpenAI),
+Cloud TTS remains available as an optional toggle.
+
+### REMOVED · The toggle that could only ever produce silence
+
+4.1's "UseGameServerTtsWhenModTtsOff" promised the game's server voice could
+cover for the mod's TTS being off. It never could — the vendor's server only
+voices lines it wrote, and with the mod answering, there are none. The
+toggle's on-path handed the turn to a dispatcher holding no audio, and the
+result was silence plus a decode error, every time, on both builds. It is
+removed rather than left as a placebo; the feature above is what it wanted
+to be. (A leftover line in an existing config file is ignored harmlessly.)
+
+### VERIFIED · The 2026-08-19 Steam update, against every hook the mod owns
+
+The game updated three days after 5.2 was built, so every one of the mod's
+55 patched methods was re-verified against the new assembly by decompiling
+it: all 55 still exist with the same signatures, the shove-freeze logic the
+mod replaces is byte-identical, and the gift name-cleaning gained exactly
+one new rejected word ("nothing") — which the mod's own list already
+carried.
+
+One real change was found and covered: the update rewired the reply
+pipeline's speech dispatch so that every line now routes through the single
+server-audio path (the local/personal branches are no longer called). The
+mod's third voice hook already owned that path, so speech keeps working —
+5.3 additionally retires the misleading log line that still described the
+old routing, and the new game-voices feature deliberately does not depend on
+any of the rewired scene plumbing, so it behaves the same on the old itch
+build and the new Steam one.
+
+### FIXED · The prompt no longer tells her a fact the game disproves
+
+Her reply rules (and the OOC channel's rule 8) claimed a second
+square-bracketed reply "starts a permanent hunt". That claim was disproven
+long ago — the strike counter behind it resets on every reply that arrives,
+so bracket strikes can never accumulate; only genuine transport failures
+can, and the mod already withdraws those — but the wording survived in the
+prompt itself. Since the OOC channel is sworn to literal truth, she would
+have repeated the exaggeration as fact if asked. Both texts now state
+exactly what happens: the reply is discarded whole and the turn is wasted.
+The rule itself (never use square brackets) is unchanged.
+
+### FIXED · Housekeeping the quality-control pass caught
+
+- Two config descriptions still said the mod forwards "the safe code".
+  There is no safe anywhere in the game — the field is the passcode to her
+  hidden room — and this exact stale claim has regrown from comments twice
+  before. Both descriptions now name the real thing.
+- The abandoned Advanced-collapse design (replaced by tabs in 4.1) left
+  three dead functions and a dead config entry behind; deleted.
+- A stale comment still described the clearance grant cap that 5.0 removed;
+  corrected to match the code.
+- The voice-route log line now says which dispatch shape the running build
+  uses instead of describing only the old one.
+
 ## 5.1.0 — the hill freeze is fixed, and gifts resolve to the real item
 
 ### FIXED · Shoving her can no longer break her forever (base-game bug)

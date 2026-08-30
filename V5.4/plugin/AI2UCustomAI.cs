@@ -17,10 +17,10 @@ using LeastSquares.Overtone;
 
 namespace AI2UCustomAI
 {
-    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.1.0")]
+    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.4.0")]
     public class Plugin : BaseUnityPlugin
     {
-        public const string VERSION = "5.1.0";
+        public const string VERSION = "5.4.0";
 
         // The old URL was a placeholder twice over: the repository did not exist
         // AND the account name was wrong, so it could never have resolved. It
@@ -48,7 +48,13 @@ namespace AI2UCustomAI
             if (Instance != null) Instance.Config.Save();
         }
 
+        public static void ApplyOpenRouterParams(JObject root)
+        {
+            Bridge.ApplyOpenRouterParams(root);
+        }
+
         public static ConfigEntry<bool> CfgEnabled;
+        public static ConfigEntry<int> CfgActiveProfile;
         public static ConfigEntry<string> CfgBaseUrl;
         public static ConfigEntry<string> CfgApiKey;
         public static ConfigEntry<string> CfgModel;
@@ -60,6 +66,7 @@ namespace AI2UCustomAI
         public static ConfigEntry<int> CfgRetries;
         public static ConfigEntry<bool> CfgHideReasoning;
         public static ConfigEntry<bool> CfgJsonMode;
+        public static ConfigEntry<bool> CfgLocalModelMode;
         public static ConfigEntry<bool> CfgClampValues;
         public static ConfigEntry<bool> CfgAiCanMurder;
         public static ConfigEntry<string> CfgTestKillPhrase;
@@ -80,17 +87,17 @@ namespace AI2UCustomAI
         public static ConfigEntry<int> CfgCustomFavorabilityPercent;
         public static ConfigEntry<string> CfgOocTag;
         public static ConfigEntry<bool> CfgForceLocalVoice;
-        public static ConfigEntry<bool> CfgGameServerTts;
 
-        // True when the player has asked for the game's own voice to cover for the
-        // mod's TTS being off. Every speech hook has to agree on this: the local
-        // -voice override and the manager hook both run BEFORE the server-audio
-        // suppression, so if either one claims the turn the game's voice path is
-        // never reached and the toggle would appear to do nothing.
-        public static bool HandVoiceBackToGame()
-        {
-            return CfgGameServerTts != null && CfgGameServerTts.Value && !GrokTts.Configured;
-        }
+        // The original game voices - the client-side Azure cast the game itself
+        // ships (see GameTts.cs). Replaces 4.1's UseGameServerTtsWhenModTtsOff,
+        // which promised the game's SERVER voice could cover for the mod's TTS.
+        // It never could: with the mod writing her lines, the vendor server never
+        // wrote them, so it has no audio for them - the toggle's on-path was
+        // silence every time, plus a decode error in the log. That toggle is gone
+        // rather than left as a placebo; this is the thing it wanted to be.
+        public static ConfigEntry<bool> CfgGameVoice;
+        public static ConfigEntry<string> CfgGameVoiceKey;
+        public static ConfigEntry<string> CfgGameVoiceRegion;
         public static ConfigEntry<bool> CfgGrokEnabled;
         public static ConfigEntry<string> CfgGrokBaseUrl;
         public static ConfigEntry<string> CfgGrokApiKey;
@@ -103,6 +110,9 @@ namespace AI2UCustomAI
         public static ConfigEntry<string> CfgTtsModel;
         public static ConfigEntry<bool> CfgTtsNormalize;
         public static ConfigEntry<float> CfgTtsVolume;
+        public static ConfigEntry<string> CfgVoiceChoice;
+        public static ConfigEntry<string> CfgOpenRouterProvider;
+        public static ConfigEntry<bool> CfgOpenRouterAllowFallback;
         public static ConfigEntry<KeyCode> CfgGrokToggleKey;
         public static ConfigEntry<bool> CfgSpeakActions;
         public static ConfigEntry<KeyCode> CfgMenuKey;
@@ -120,7 +130,6 @@ namespace AI2UCustomAI
         public static ConfigEntry<bool> CfgCheats;
         public static ConfigEntry<int> CfgCheatsTrustStep;
         public static ConfigEntry<bool> CfgShowCheats;
-        public static ConfigEntry<bool> CfgShowAdvanced;
         public static ConfigEntry<bool> CfgShowStatusStrip;
 
         private void Awake()
@@ -130,12 +139,19 @@ namespace AI2UCustomAI
 
             CfgEnabled = Config.Bind("General", "Enabled", true,
                 "Route NPC dialogue to your own OpenAI-compatible endpoint instead of the AI2U game server.");
+            CfgActiveProfile = Config.Bind("Profiles", "ActiveProfile", 1,
+                "Currently active configuration profile (1, 2, or 3).");
+            ProfileManager.Init();
             CfgBaseUrl = Config.Bind("Endpoint", "BaseUrl", "https://openrouter.ai/api/v1",
                 "OpenAI-compatible base URL. '/chat/completions' is appended automatically.");
             CfgApiKey = Config.Bind("Endpoint", "ApiKey", "",
                 "Your API key, sent as 'Authorization: Bearer <key>'.");
             CfgModel = Config.Bind("Endpoint", "Model", "google/gemini-3.6-flash",
                 "Model identifier passed to the endpoint.");
+            CfgOpenRouterProvider = Config.Bind("OpenRouter", "Provider", "auto",
+                "Specific OpenRouter provider to route requests to (e.g. Together, Anthropic, DeepInfra, Hyperbolic, Groq, Fireworks, Bedrock, etc. Comma-separated for order). Set to 'auto' or empty for OpenRouter default.");
+            CfgOpenRouterAllowFallback = Config.Bind("OpenRouter", "AllowFallback", true,
+                "Allow fallback to other providers on OpenRouter if the selected provider fails.");
             CfgTemperature = Config.Bind("Sampling", "Temperature", 0.9f, "Sampling temperature.");
             CfgMaxTokens = Config.Bind("Sampling", "MaxTokens", 3000,
                 "Max tokens per reply. Reasoning models spend hidden tokens against this budget before "
@@ -165,30 +181,26 @@ namespace AI2UCustomAI
                 + "Gemini 3.x and other reasoning models, which otherwise narrate instead of answering.");
             CfgJsonMode = Config.Bind("Sampling", "ForceJsonMode", false,
                 "Send response_format=json_object. Tightens output, but some endpoints reject it.");
+            CfgLocalModelMode = Config.Bind("Sampling", "LocalModelMode", false,
+                "Optimize and streamline prompts for small/local AI models (Ollama, LM Studio, etc.). Minimizes prompt size, latency, and hallucinations.");
             CfgForceLocalVoice = Config.Bind("Voice", "ForceLocalVoice", true,
                 "Switch the NPC to on-device Overtone TTS. Required when using a custom endpoint: the "
                 + "game normally plays base64 audio the AI2U server returns alongside the reply, and a "
                 + "custom endpoint cannot supply that, so the NPC would stay silent. Turn this off only "
                 + "if you have set your own Azure Speech key in the game's AI Setup page.");
-            // What happens to her voice when the mod's own TTS is switched off.
-            //
-            // Off - the default - she is silent. That is the honest outcome: with
-            // the mod's endpoint answering, the game's server never wrote the line,
-            // so asking it to voice one means a second request to AI2U's servers
-            // for audio only. That is their metered service being used for a reply
-            // it did not produce, and it is not a cost the mod should incur on
-            // someone's behalf without being asked.
-            //
-            // On, the AzureAISpeak suppression is skipped and the game's normal
-            // voice path runs. Whether it actually produces sound depends on the
-            // build and on the player's own AI Setup key, which is exactly why
-            // this is a toggle rather than a promise.
-            CfgGameServerTts = Config.Bind("Voice", "UseGameServerTtsWhenModTtsOff", false,
-                "Use the game's servers for TTS while the mod's TTS is turned off. Off - the default - "
-                + "she is simply silent when the mod's voice is off, and nothing is sent to AI2U's "
-                + "servers. On, the game's own voice path is allowed to run, which may use your AI2U "
-                + "account's metered TTS or your own Azure key from the game's AI Setup page. It does "
-                + "not affect the text of her replies either way - those still come from your endpoint.");
+            // The original game voices. The full reasoning lives at the top of
+            // GameTts.cs; the short version is that this performs the game's own
+            // dormant "personal TTS key" mode faithfully - same voices, same
+            // prosody, same casting - through the player's own Azure Speech key,
+            // on both store builds and on every level.
+            CfgVoiceChoice = Config.Bind("Voice", "VoiceMode", "local",
+                "Voice synthesis mode: 'local' (Offline Overtone, 0 keys needed), 'azure' (Original Game Azure Cloud Neural voices), or 'cloud' (Custom Cloud TTS Provider).");
+            CfgGameVoice = Config.Bind("GameVoice", "UseGameOriginalVoices", true,
+                "Speak her lines with the ORIGINAL game's own voice engine (Local Overtone or Azure Cloud).");
+            CfgGameVoiceKey = Config.Bind("GameVoice", "AzureSpeechKey", "",
+                "Azure Speech API key for Cloud Original voice mode.");
+            CfgGameVoiceRegion = Config.Bind("GameVoice", "AzureSpeechRegion", "eastus",
+                "Azure Speech region (e.g. eastus, westeurope) for Cloud Original voice mode.");
             CfgSpeakActions = Config.Bind("Voice", "SpeakActions", false,
                 "Read stage directions out loud. Models in character write actions inline, like "
                 + "\"*grabs the controller* almost got it\". Off - the default - speaks only the words "
@@ -376,15 +388,18 @@ namespace AI2UCustomAI
                 "Recover the character's persona, backstory and secrets from the game itself and send "
                 + "them with each request. The authored story guides come from the game's own "
                 + "localisation data and the per-playthrough answers - her computer password, the wifi "
-                + "password, the safe code, the potion recipe, which room was generated - come from the "
-                + "live context object the game builds for its own server. Without this she does not "
-                + "know her own name's worth of history and cannot answer questions about her own home. "
-                + "She is still told to withhold secrets until the player earns them.");
+                + "password, the passcode to her hidden room, the potion recipe, which room was "
+                + "generated - come from the live context object the game builds for its own server. "
+                + "Without this she does not know her own name's worth of history and cannot answer "
+                + "questions about her own home. She is still told to withhold secrets until the "
+                + "player earns them.");
 
             // The procedure around the answers, as opposed to the answers.
             // SendCharacterLore already forwards the potion recipe, the element
-            // colours, the passwords and the safe code out of the game's own
-            // context objects. What it cannot forward is how the objects relate -
+            // colours, the passwords and the hidden-room passcode out of the
+            // game's own context objects. (Not a "safe code" - there is no safe
+            // anywhere in the game; that stale claim once regrew from a comment
+            // exactly like this one.) What it cannot forward is how the objects relate -
             // that the summoning circle must be woken by turning four bookshelves
             // before the cauldron is any use, that a summoned soul costs the player
             // health per question, that the engine explodes if its pressure tops
@@ -588,9 +603,10 @@ namespace AI2UCustomAI
                 "Show the developer cheats section expanded in the F9 panel. Purely cosmetic - it "
                 + "changes what the panel displays, never what the mod does.");
 
-            CfgShowAdvanced = Config.Bind("General", "ShowAdvancedSettings", false,
-                "Show the advanced section of the F9 panel. Purely cosmetic - it changes what the "
-                + "panel displays, never what the mod does.");
+            // ShowAdvancedSettings is deliberately no longer bound: the Advanced
+            // collapse it toggled was replaced by tabs in 4.1 and its draw code
+            // was already dead. A stale line in an existing config file is
+            // ignored by BepInEx and harms nothing.
 
             CfgShowStatusStrip = Config.Bind("General", "ShowStatusStrip", true,
                 "Show the live status strip along the top of the F9 panel: which character you are "
@@ -884,7 +900,20 @@ namespace AI2UCustomAI
 
             // Wording matches the Audio-page dropdown, and stays provider-neutral:
             // the key may be xAI or ElevenLabs depending on BaseUrl.
-            if (now && string.IsNullOrEmpty(CfgGrokApiKey.Value))
+            //
+            // With the original game voices on, F8 only moves the FALLBACK: the
+            // game cast keeps speaking either way, and a toast that said "voice
+            // off - silent" while she kept talking would read as the toggle
+            // being broken.
+            if (GameTts.Configured)
+            {
+                _toast = now
+                    ? "Cloud TTS fallback: ON - game voices still speak first"
+                    : "Cloud TTS fallback: OFF - game voices keep speaking";
+                Log.LogInfo("AI Voice toggle moved, but the original game voices are on and "
+                    + "keep priority; the cloud provider is only the fallback.");
+            }
+            else if (now && string.IsNullOrEmpty(CfgGrokApiKey.Value))
             {
                 _toast = "AI Voice ON - but no TTS key is set";
                 Log.LogWarning("AI Voice switched on, but GrokTTS/ApiKey is empty; "
@@ -1236,14 +1265,11 @@ namespace AI2UCustomAI
                 + (Text == null ? 0 : Text.Length) + ", character=" + currentCharacterID + ").");
 
             // Installed unconditionally now, so the voice settings can be changed
-            // live. When neither voice feature is wanted, hand the call straight
+            // live. When no voice feature is wanted, hand the call straight
             // back to the game.
             if (Plugin.CfgEnabled == null || !Plugin.CfgEnabled.Value) return true;
-            if (!Plugin.CfgForceLocalVoice.Value && !Plugin.CfgGrokEnabled.Value) return true;
-
-            // The mod's voice is off and the player asked the game to cover for it,
-            // so this hook must not claim the turn.
-            if (Plugin.HandVoiceBackToGame()) return true;
+            if (!Plugin.CfgForceLocalVoice.Value && !Plugin.CfgGrokEnabled.Value
+                && !GameTts.Configured) return true;
 
             try
             {
@@ -1255,13 +1281,13 @@ namespace AI2UCustomAI
                 }
 
                 // Overtone's Engine and Voice are needed to synthesize ON DEVICE and
-                // for nothing else - a cloud voice only needs an AudioSource to play
+                // for nothing else - a remote voice only needs an AudioSource to play
                 // through. Demanding them unconditionally made her mute on the Steam
                 // build, where Overtone's synthesis is stripped, so Engine is null
                 // there permanently: every line bailed out to the original method,
                 // which then threw on _player.sources[0] - the exact fault this
                 // patch exists to avoid.
-                if (!GrokTts.Configured && (player.Engine == null || player.Voice == null))
+                if (!ModTts.Wanted && (player.Engine == null || player.Voice == null))
                 {
                     Plugin.Log.LogWarning("TTS: no cloud voice is configured and the on-device voice is not ready, "
                         + "so this line goes back to the game. Press F8 or set a TTS key to use the cloud voice.");
@@ -1481,12 +1507,14 @@ namespace AI2UCustomAI
 
         static IEnumerator SpeakRoutine(TTSPlayer player, string text, AudioSource dest)
         {
-            // Grok first when configured; on any failure fall through to the
-            // on-device voice so a dropped request never leaves her mute.
-            if (GrokTts.Configured)
+            // The remote voices first when configured - game voices, then the
+            // cloud provider (ModTts owns that order); on any failure fall
+            // through to the on-device voice so a dropped request never leaves
+            // her mute.
+            if (ModTts.Wanted)
             {
                 AudioClip remote = null;
-                IEnumerator call = GrokTts.Synthesize(text, delegate(AudioClip c) { remote = c; });
+                IEnumerator call = ModTts.Synthesize(text, delegate(AudioClip c) { remote = c; });
                 while (call.MoveNext()) yield return call.Current;
 
                 if (remote != null)
@@ -1494,7 +1522,7 @@ namespace AI2UCustomAI
                     Play(player, dest, remote);
                     yield break;
                 }
-                Plugin.Log.LogWarning("Grok TTS unavailable for this line; using the local voice.");
+                Plugin.Log.LogWarning("Remote TTS unavailable for this line; using the local voice.");
             }
 
             Task task = LocalSynth.Begin(player, text);
@@ -1577,12 +1605,14 @@ namespace AI2UCustomAI
                 catch (Exception) { }
             }
 
-            // HandVoiceBackToGame excluded: forcing isLocalSpeak would route her to
-            // the on-device path, which is the one thing the player just said they
-            // do not want when they asked the game's servers to speak.
+            // Any of the three voice features wants the local dispatch route:
+            // isLocalSpeak aims the OLD builds' reply dispatch at the branch our
+            // hooks own. (The 2026-08-19 Steam build routes every reply through
+            // AzureAISpeak regardless, where the suppression hook covers us, so
+            // there this flag only matters to the game's token metering.)
             bool wantOverride = Plugin.CfgEnabled != null && Plugin.CfgEnabled.Value
-                && (Plugin.CfgForceLocalVoice.Value || Plugin.CfgGrokEnabled.Value)
-                && !Plugin.HandVoiceBackToGame();
+                && (Plugin.CfgForceLocalVoice.Value || Plugin.CfgGrokEnabled.Value
+                    || GameTts.Configured);
 
             if (!wantOverride)
             {
@@ -1753,13 +1783,14 @@ namespace AI2UCustomAI
 
             if (Plugin.CfgEnabled == null || !Plugin.CfgEnabled.Value) return true;
 
-            // With no cloud voice configured there is nothing here that the
+            // With no remote voice configured there is nothing here that the
             // game's own path does not do better, so let it run: on the itch
             // build Overtone genuinely works.
-            if (!GrokTts.Configured)
+            if (!ModTts.Wanted)
             {
-                Plugin.Log.LogWarning("Voice: no cloud TTS configured, so the game's own path runs. "
-                    + "On the Steam build that means silence - Overtone is stripped there.");
+                Plugin.Log.LogWarning("Voice: no game-voice or cloud TTS configured, so the game's "
+                    + "own path runs. On the Steam build that means silence - Overtone is stripped "
+                    + "there.");
                 return true;
             }
 
@@ -1806,20 +1837,20 @@ namespace AI2UCustomAI
         internal static IEnumerator CloudRoutine(Communicator comm, string text, AudioSource dest)
         {
             AudioClip clip = null;
-            IEnumerator call = GrokTts.Synthesize(text, delegate (AudioClip c) { clip = c; });
+            IEnumerator call = ModTts.Synthesize(text, delegate (AudioClip c) { clip = c; });
             while (call.MoveNext()) yield return call.Current;
 
             if (clip == null)
             {
-                Plugin.Log.LogWarning("Voice: cloud TTS gave nothing back for this line ("
-                    + GrokTts.FailureLabel() + "); she stays quiet on it.");
+                Plugin.Log.LogWarning("Voice: remote TTS gave nothing back for this line ("
+                    + ModTts.FailureLabel() + "); she stays quiet on it.");
                 yield break;
             }
 
             dest.clip = clip;
             dest.loop = false;
             dest.volume = 1f;
-            dest.pitch = 1f;
+            dest.pitch = (ModTts.IsGameVoice && (Plugin.CfgVoiceChoice == null || Plugin.CfgVoiceChoice.Value == "local")) ? GameTts.GetVoiceSpec(Identity.CharacterId()).Pitch : 1f;
             dest.Play();
 
             // This is how the game learns the line has audio and how long it
@@ -1885,9 +1916,9 @@ namespace AI2UCustomAI
         }
 
         // Give a claim back, for a caller that claimed the turn and then decided
-        // to let the game's own voice path have it after all. Without this the
-        // turn stays marked as spoken and any later speak path in the same turn
-        // is refused, which would turn "hand it back" into silence.
+        // not to speak it after all. No current caller (the hand-back branch that
+        // needed it was removed with UseGameServerTtsWhenModTtsOff), but the
+        // claim system is incomplete without an undo, so it stays.
         internal static void Release()
         {
             if (_spokenTurn == _turn) _spokenTurn = -1;
@@ -1934,10 +1965,11 @@ namespace AI2UCustomAI
                     .Field("isUsingPersonalTTSAPIKey").GetValue();
                 Plugin.Log.LogInfo("Voice: reply resolving. isLocalSpeak=" + Communicator.isLocalSpeak
                     + " isUsingPersonalTTSAPIKey=" + (personal == null ? "<unreadable>" : personal.ToString())
-                    + " -> expecting "
+                    + " -> on the pre-2026-08-19 dispatch expecting "
                     + (!Communicator.isLocalSpeak ? "AzureAISpeak (server audio)"
                         : ("True".Equals(personal == null ? "" : personal.ToString())
-                            ? "AzureAISpeak_PersonalAPI" : "LocalSpeak")));
+                            ? "AzureAISpeak_PersonalAPI" : "LocalSpeak"))
+                    + "; newer builds route every reply through AzureAISpeak.");
             }
             catch (Exception e)
             {
@@ -2184,44 +2216,35 @@ namespace AI2UCustomAI
             Plugin.Log.LogInfo("Voice: server-audio hook entered (AzureAISpeak).");
 
             if (Plugin.CfgEnabled == null || !Plugin.CfgEnabled.Value) return true;
-            if (!GrokTts.Configured && !Plugin.CfgForceLocalVoice.Value) return true;
+            if (!ModTts.Wanted && !Plugin.CfgForceLocalVoice.Value) return true;
 
             // Measured on the Steam build: this is the ONLY speak call that runs
-            // there. isLocalSpeak reads true and LocalSpeak is still never
-            // entered, so suppressing here - which is all this patch used to do -
-            // was itself the cause of the silence. Speak instead.
+            // there - and since the 2026-08-19 game update it is the only speak
+            // call the reply path makes on that build at all (the dispatch that
+            // used to pick LocalSpeak / AzureAISpeak_PersonalAPI was removed).
+            // isLocalSpeak reads true and LocalSpeak is still never entered, so
+            // suppressing here - which is all this patch used to do - was itself
+            // the cause of the silence. Speak instead.
             //
             // On the itch build LocalSpeak fires first and claims the turn, so
             // this falls through to plain suppression and nothing is said twice.
             if (!SpeechDispatch.Claim()) return false;
 
-            // GrokTts.Configured folds together two very different causes - the
-            // voice being switched off and the key being absent - so they are
-            // reported apart here. Conflating them sent me hunting for a missing
-            // key that was set all along.
-            if (!GrokTts.Configured)
+            // ModTts.Wanted folds together different causes - a voice switched
+            // off and a key never set - so they are reported apart here.
+            // Conflating them sent me hunting for a missing key that was set all
+            // along.
+            //
+            // There is deliberately no "let the game's server speak instead"
+            // branch any more. 4.1 shipped one (UseGameServerTtsWhenModTtsOff)
+            // and it was a placebo: the vendor's server only voices lines it
+            // wrote itself, and with the mod answering, it wrote none - so the
+            // hand-back played a null speechResult and the result was silence
+            // with a decode error, every time. The real version of that wish is
+            // the game-voice feature (GameTts.cs).
+            if (!ModTts.Wanted)
             {
-                // The one case where handing the turn back to the game is what the
-                // player asked for. Returning true runs the original AzureAISpeak,
-                // so the game voices the line through its own account or the
-                // player's Azure key. Off by default because that spends someone
-                // else's metered service on a reply their server did not write.
-                if (Plugin.CfgGameServerTts != null && Plugin.CfgGameServerTts.Value)
-                {
-                    Plugin.Log.LogInfo("Voice: the mod's voice is off and "
-                        + "UseGameServerTtsWhenModTtsOff is on, so the game's own voice path is "
-                        + "handling this line.");
-                    SpeechDispatch.Release();
-                    return true;
-                }
-
-                if (Plugin.CfgGrokEnabled != null && !Plugin.CfgGrokEnabled.Value)
-                    Plugin.Log.LogInfo("Voice: the voice is switched off, so this line is silent. "
-                        + "Press F8, or turn it on in the F9 panel. To let the game's own servers "
-                        + "speak instead, turn on UseGameServerTtsWhenModTtsOff in the F9 panel.");
-                else
-                    Plugin.Log.LogWarning("Voice: server audio suppressed and no TTS key is set, "
-                        + "so this line is silent. Set one in the F9 panel.");
+                Plugin.Log.LogInfo("Voice: speech is turned off, so this line is silent. Turn on Original Game Voices or Cloud TTS in the F9 menu to enable speech.");
                 return false;
             }
 
@@ -3227,8 +3250,128 @@ namespace AI2UCustomAI
             if (done != null) done(null);
         }
 
+        static string BuildCompactLocalPrompt(bool summon)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            if (summon)
+            {
+                sb.AppendLine("You are a spirit summoned from a magic circle. Answer the player's question briefly and directly.");
+            }
+            else
+            {
+                Communicator c = UnityEngine.Object.FindObjectOfType<Communicator>();
+                string npc = null;
+                string player = null;
+                if (c != null)
+                {
+                    try { npc = Traverse.Create(c).Field("npcName").GetValue<string>(); } catch { }
+                    try { player = Traverse.Create(c).Field("playerName").GetValue<string>(); } catch { }
+                }
+                if (string.IsNullOrEmpty(npc)) npc = "the character";
+                if (string.IsNullOrEmpty(player)) player = "the player";
+
+                sb.AppendLine("You are " + npc + ", talking to " + player + ".");
+                sb.AppendLine("Stay in character. React naturally and directly to the conversation.");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("Output MUST be a single raw JSON object matching this schema:");
+            sb.AppendLine("{");
+            sb.AppendLine("  \"npc_reply_to_player\": \"Spoken dialogue response\",");
+            sb.AppendLine("  \"npc_action\": \"other\",");
+            sb.AppendLine("  \"npc_face_expression\": \"neutral\",");
+            sb.AppendLine("  \"giving_to_player\": \"\"");
+            sb.AppendLine("}");
+            sb.AppendLine("Allowed npc_action: other, follow_player, stop_following, walk_away, attack_player");
+            sb.AppendLine("Allowed npc_face_expression: neutral, smile, angry, sad, surprise, shy, scared, disgust");
+            sb.AppendLine("Rules: Only output the raw JSON object. No markdown fences. No meta-commentary.");
+
+            return sb.ToString().Trim();
+        }
+
         static string BuildRequest(List<TextMessage> history, string image = null, string imageNote = null)
         {
+            bool summon = Identity.IsSummon();
+            if (summon) Plugin.Log.LogInfo("[summon] magic circle / ghost: persona blocks suppressed");
+
+            bool localOpt = Plugin.CfgLocalModelMode != null && Plugin.CfgLocalModelMode.Value;
+            if (localOpt)
+            {
+                JArray localMessages = new JArray();
+
+                // 1. Single concise system prompt (~120 tokens)
+                string compactPrompt = BuildCompactLocalPrompt(summon);
+                JObject sysObj = new JObject();
+                sysObj["role"] = "system";
+                sysObj["content"] = compactPrompt;
+                localMessages.Add(sysObj);
+
+                // 2. Only recent conversation turns (last 6 messages max, skipping system)
+                int start = Math.Max(0, history.Count - 6);
+                for (int i = start; i < history.Count; i++)
+                {
+                    TextMessage m = history[i];
+                    if (m == null || string.IsNullOrEmpty(m.content)) continue;
+                    string role = NormalizeRole(m.role);
+                    if (role == "system") continue;
+
+                    JObject jm = new JObject();
+                    jm["role"] = role;
+                    jm["content"] = m.content;
+                    localMessages.Add(jm);
+                }
+
+                // 3. OOC override if player used [OOC]
+                string localOoc = Ooc.Block();
+                if (localOoc != null)
+                {
+                    JObject oo = new JObject();
+                    oo["role"] = "system";
+                    oo["content"] = localOoc;
+                    localMessages.Add(oo);
+                }
+
+                // 4. Vision image if present
+                if (image != null)
+                {
+                    JArray parts = new JArray();
+                    JObject text = new JObject();
+                    text["type"] = "text";
+                    text["text"] = imageNote != null ? imageNote : "The player is showing you this. React to what you see in it:";
+                    parts.Add(text);
+
+                    JObject pic = new JObject();
+                    pic["type"] = "image_url";
+                    JObject urlObj = new JObject();
+                    urlObj["url"] = "data:image/jpeg;base64," + image;
+                    pic["image_url"] = urlObj;
+                    parts.Add(pic);
+
+                    JObject imgMsg = new JObject();
+                    imgMsg["role"] = "user";
+                    imgMsg["content"] = parts;
+                    localMessages.Add(imgMsg);
+                }
+
+                JObject payload = new JObject();
+                payload["model"] = Plugin.CfgModel.Value;
+                payload["messages"] = localMessages;
+                payload["temperature"] = Plugin.CfgTemperature.Value;
+                if (Plugin.CfgMaxTokens.Value > 0)
+                    payload["max_tokens"] = Plugin.CfgMaxTokens.Value;
+
+                if (Plugin.CfgJsonMode.Value)
+                {
+                    JObject fmt = new JObject();
+                    fmt["type"] = "json_object";
+                    payload["response_format"] = fmt;
+                }
+
+                ApplyOpenRouterParams(payload);
+                return payload.ToString(Formatting.None);
+            }
+
             JArray messages = new JArray();
             for (int i = 0; i < history.Count; i++)
             {
@@ -3253,28 +3396,6 @@ namespace AI2UCustomAI
                 if (role == "system" && Plugin.CfgClampValues.Value)
                     Schema.Learn(m.content);
             }
-
-            // A magic circle summon is not the level's main character, and our
-            // patch sits below the routing that would have told the server so.
-            // Without this the soul of a sacrificed toy answers with the witch's
-            // name, her traits, her trust level and her potion secrets - which is
-            // exactly what it did before 4.3.
-            //
-            // Subtracting her persona is necessary but was not sufficient, and an
-            // earlier version of this comment claimed otherwise. The authored
-            // framing the game builds at NPCMasterBehavior_MagicCircle.cs:42-51
-            // resolves to two fragments that establish a toy was sacrificed and
-            // that the player asked something - not that the responder is the
-            // summoned soul. Vanilla covered that server-side. So with her blocks
-            // gone the summon had no identity at all and answered as her anyway.
-            // Identity.SummonBlock() now supplies the boundary; see the reasoning
-            // there for what it does and does not assert.
-            //
-            // What still goes out: GameVocab.Contract() (engine schema and the
-            // encounter fields, minus the main character's ownership rules) and the
-            // JSON reminder. Both apply to any speaker.
-            bool summon = Identity.IsSummon();
-            if (summon) Plugin.Log.LogInfo("[summon] magic circle / ghost: persona blocks suppressed");
 
             // Who she is and what she knows. First of the injected blocks on
             // purpose: it is the level prompt's replacement, so everything after
@@ -3619,13 +3740,46 @@ namespace AI2UCustomAI
                 root["response_format"] = rf;
             }
 
-            // OpenRouter omits token accounting unless it is asked for, which makes a paid session
-            // look free. Opting in lets us log the real per-request cost.
-            JObject usageOpt = new JObject();
-            usageOpt["include"] = true;
-            root["usage"] = usageOpt;
+            ApplyOpenRouterParams(root);
 
             return root.ToString(Formatting.None);
+        }
+
+        internal static void ApplyOpenRouterParams(JObject root)
+        {
+            if (root == null) return;
+            string baseUrl = Plugin.CfgBaseUrl != null ? Plugin.CfgBaseUrl.Value : "";
+            if (!string.IsNullOrEmpty(baseUrl) && baseUrl.IndexOf("openrouter", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                if (Plugin.CfgOpenRouterProvider != null && !string.IsNullOrEmpty(Plugin.CfgOpenRouterProvider.Value))
+                {
+                    string p = Plugin.CfgOpenRouterProvider.Value.Trim();
+                    if (!string.Equals(p, "auto", StringComparison.OrdinalIgnoreCase) && p.Length > 0)
+                    {
+                        JObject prov = new JObject();
+                        string[] split = p.Split(new char[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries);
+                        JArray order = new JArray();
+                        for (int sIdx = 0; sIdx < split.Length; sIdx++)
+                        {
+                            string entry = split[sIdx].Trim();
+                            if (entry.Length > 0) order.Add(entry);
+                        }
+                        if (order.Count > 0)
+                        {
+                            prov["order"] = order;
+                            if (Plugin.CfgOpenRouterAllowFallback != null)
+                                prov["allow_fallbacks"] = Plugin.CfgOpenRouterAllowFallback.Value;
+                            root["provider"] = prov;
+                        }
+                    }
+                }
+
+                // OpenRouter omits token accounting unless it is asked for, which makes a paid session
+                // look free. Opting in lets us log the real per-request cost.
+                JObject usageOpt = new JObject();
+                usageOpt["include"] = true;
+                root["usage"] = usageOpt;
+            }
         }
 
         static string NormalizeRole(string role)

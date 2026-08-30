@@ -234,13 +234,17 @@ namespace AI2UCustomAI
 
             // Real hazard, and this mode is where it is most likely to fire:
             // NPCMasterBehavior_MainCharacter.cs:936 voids any reply whose text
-            // contains a square bracket, and the second void calls
-            // FinalChaseStart(). An out-of-character answer is exactly the kind
-            // that wants to write "[OOC]" or bracket a field name.
+            // contains a square bracket. An out-of-character answer is exactly
+            // the kind that wants to write "[OOC]" or bracket a field name.
+            //
+            // The old wording claimed the second void "starts hunting the
+            // player". That was disproven (the strike counter resets on every
+            // received reply - see GameVocab.ReplyRules), and this channel is
+            // sworn to literal truth, so it must not carry the exaggeration.
             sb.Append("8. NEVER put a square bracket in npc_reply_to_player. Not around ");
             sb.Append(tag).Append(", not around field names, not anywhere. The game discards any ");
-            sb.Append("reply containing one and starts hunting the player after the second, so a ");
-            sb.Append("bracketed answer is worse than no answer. Do not echo the tag back at all - ");
+            sb.Append("reply containing one - the player gets a canned placeholder instead of your ");
+            sb.Append("answer and the turn is wasted. Do not echo the tag back at all - ");
             sb.Append("write the field names bare, and round brackets are also stripped from what ");
             sb.Append("you say, so avoid those too.\n");
 

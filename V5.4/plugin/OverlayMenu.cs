@@ -23,10 +23,13 @@
 //   leaves IMGUI keyboard events untouched. That split is what lets us type an
 //   API key without walking the character across the room.
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.Networking;
+using Newtonsoft.Json.Linq;
 
 namespace AI2UCustomAI
 {
@@ -36,8 +39,11 @@ namespace AI2UCustomAI
 
         public static bool IsOpen { get; private set; }
 
-        static Rect _win = new Rect(0f, 0f, 840f, 660f);
+        static Rect _win = new Rect(0f, 0f, 1176f, 924f);
         static Vector2 _scroll;
+        static bool _isResizing = false;
+        static Vector2 _resizeStartMouse;
+        static Vector2 _resizeStartSize;
 
         // Whether the Canalpa sub-settings are revealed. Deliberately NOT
         // persisted: it resets to hidden every session, so the spoiler consent is
@@ -110,6 +116,295 @@ namespace AI2UCustomAI
         static Color _resTextColor = Color.white, _resVoiceColor = Color.white;
         static bool _busyText, _busyVoice;
 
+        static List<string> _modelList = new List<string>();
+        static bool _fetchingModels = false;
+        static string _fetchModelError = null;
+        static bool _modelDropdownOpen = false;
+        static string _modelSearchQuery = "";
+        static Vector2 _modelScroll = Vector2.zero;
+
+        static List<string> _providerList = new List<string>();
+        static bool _fetchingProviders = false;
+        static string _fetchProviderError = null;
+        static string _lastFetchedProviderModel = null;
+
+        static bool IsOpenRouterBaseUrl()
+        {
+            string url = Get("BaseUrl");
+            if (string.IsNullOrEmpty(url) && Plugin.CfgBaseUrl != null)
+                url = Plugin.CfgBaseUrl.Value;
+            return url != null && url.IndexOf("openrouter", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public static void FetchModelsAsync()
+        {
+            if (_fetchingModels) return;
+            _fetchingModels = true;
+            _fetchModelError = null;
+
+            string baseUrl = Plugin.CfgBaseUrl != null ? Plugin.CfgBaseUrl.Value : "";
+            string apiKey = Plugin.CfgApiKey != null ? Plugin.CfgApiKey.Value : "";
+
+            if (_buf.ContainsKey("BaseUrl") && !string.IsNullOrEmpty(_buf["BaseUrl"]))
+                baseUrl = _buf["BaseUrl"];
+            if (_buf.ContainsKey("ApiKey") && !string.IsNullOrEmpty(_buf["ApiKey"]))
+                apiKey = _buf["ApiKey"];
+
+            if (string.IsNullOrEmpty(baseUrl))
+            {
+                _fetchingModels = false;
+                _fetchModelError = "Please enter Base URL first";
+                return;
+            }
+
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                List<string> found = new List<string>();
+                string err = null;
+
+                try
+                {
+                    try
+                    {
+                        System.Net.ServicePointManager.SecurityProtocol |=
+                            System.Net.SecurityProtocolType.Tls12 |
+                            (System.Net.SecurityProtocolType)3072 |
+                            (System.Net.SecurityProtocolType)12288;
+                    }
+                    catch (Exception) { }
+
+                    string clean = baseUrl.Trim().TrimEnd('/');
+                    if (clean.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+                        clean = clean.Substring(0, clean.Length - "/chat/completions".Length);
+
+                    List<string> candidates = new List<string>();
+                    if (clean.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) || clean.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidates.Add(clean + "/models");
+                    }
+                    else
+                    {
+                        candidates.Add(clean + "/v1/models");
+                        candidates.Add(clean + "/api/v1/models");
+                        candidates.Add(clean + "/models");
+                        candidates.Add(clean + "/api/tags");
+                    }
+
+                    foreach (string url in candidates)
+                    {
+                        try
+                        {
+                            System.Net.HttpWebRequest req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                            req.Method = "GET";
+                            req.Timeout = 8000;
+                            req.ReadWriteTimeout = 8000;
+                            req.UserAgent = "AI2U-CustomAI/5.4";
+                            if (!string.IsNullOrEmpty(apiKey))
+                                req.Headers["Authorization"] = "Bearer " + apiKey.Trim();
+                            req.Headers["HTTP-Referer"] = "https://github.com/ai2u-custom-ai";
+                            req.Headers["X-Title"] = "AI2U Custom AI";
+
+                            using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+                            using (System.IO.Stream s = resp.GetResponseStream())
+                            using (System.IO.StreamReader r = new System.IO.StreamReader(s, System.Text.Encoding.UTF8))
+                            {
+                                string json = r.ReadToEnd();
+                                if (!string.IsNullOrEmpty(json))
+                                {
+                                    JToken root = JToken.Parse(json);
+                                    if (root is JObject)
+                                    {
+                                        JObject obj = (JObject)root;
+                                        JArray data = obj["data"] as JArray;
+                                        if (data != null)
+                                        {
+                                            foreach (JToken item in data)
+                                            {
+                                                string id = item["id"] != null ? item["id"].ToString() : null;
+                                                if (!string.IsNullOrEmpty(id) && !found.Contains(id))
+                                                    found.Add(id);
+                                            }
+                                        }
+
+                                        JArray modelsArr = obj["models"] as JArray;
+                                        if (modelsArr != null)
+                                        {
+                                            foreach (JToken item in modelsArr)
+                                            {
+                                                string id = item["name"] != null ? item["name"].ToString() : (item["model"] != null ? item["model"].ToString() : null);
+                                                if (!string.IsNullOrEmpty(id) && !found.Contains(id))
+                                                    found.Add(id);
+                                            }
+                                        }
+                                    }
+                                    else if (root is JArray)
+                                    {
+                                        JArray arr = (JArray)root;
+                                        foreach (JToken item in arr)
+                                        {
+                                            string id = item["id"] != null ? item["id"].ToString() : (item["name"] != null ? item["name"].ToString() : null);
+                                            if (!string.IsNullOrEmpty(id) && !found.Contains(id))
+                                                found.Add(id);
+                                        }
+                                    }
+
+                                    if (found.Count > 0)
+                                    {
+                                        found.Sort(StringComparer.OrdinalIgnoreCase);
+                                        err = null;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        catch (System.Net.WebException we)
+                        {
+                            string detail = we.Message;
+                            if (we.Response is System.Net.HttpWebResponse)
+                            {
+                                System.Net.HttpWebResponse wr = (System.Net.HttpWebResponse)we.Response;
+                                detail = "HTTP " + (int)wr.StatusCode + " " + wr.StatusDescription;
+                            }
+                            err = detail;
+                        }
+                        catch (Exception ex)
+                        {
+                            err = ex.Message;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    err = e.Message;
+                }
+                finally
+                {
+                    _fetchingModels = false;
+                    if (found.Count > 0)
+                    {
+                        _modelList = found;
+                        _fetchModelError = null;
+                    }
+                    else
+                    {
+                        _fetchModelError = err ?? "No models returned from endpoint";
+                    }
+                }
+            });
+        }
+
+        public static void SetBaseUrlQuick(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return;
+            _buf["BaseUrl"] = url;
+            if (Plugin.CfgBaseUrl != null)
+            {
+                Plugin.CfgBaseUrl.Value = url;
+                Plugin.SaveCfg();
+            }
+            Note("Base URL set to: " + url);
+        }
+
+        public static void FetchProvidersAsync()
+        {
+            if (_fetchingProviders) return;
+            _fetchingProviders = true;
+            _fetchProviderError = null;
+
+            string curModel = Get("Model");
+            if (string.IsNullOrEmpty(curModel) && Plugin.CfgModel != null)
+                curModel = Plugin.CfgModel.Value;
+            curModel = (curModel ?? "").Trim();
+
+            string apiKey = Plugin.CfgApiKey != null ? Plugin.CfgApiKey.Value : "";
+            if (_buf.ContainsKey("ApiKey") && !string.IsNullOrEmpty(_buf["ApiKey"]))
+                apiKey = _buf["ApiKey"];
+
+            if (string.IsNullOrEmpty(curModel))
+            {
+                _fetchingProviders = false;
+                _fetchProviderError = "Please specify a Model first";
+                return;
+            }
+
+            _lastFetchedProviderModel = curModel;
+
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                List<string> found = new List<string>();
+                string err = null;
+
+                try
+                {
+                    try
+                    {
+                        System.Net.ServicePointManager.SecurityProtocol |=
+                            System.Net.SecurityProtocolType.Tls12 |
+                            (System.Net.SecurityProtocolType)3072 |
+                            (System.Net.SecurityProtocolType)12288;
+                    }
+                    catch (Exception) { }
+
+                    string url = "https://openrouter.ai/api/v1/models/" + curModel + "/endpoints";
+                    System.Net.HttpWebRequest req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                    req.Method = "GET";
+                    req.Timeout = 8000;
+                    req.ReadWriteTimeout = 8000;
+                    req.UserAgent = "AI2U-CustomAI/5.4";
+                    if (!string.IsNullOrEmpty(apiKey))
+                        req.Headers["Authorization"] = "Bearer " + apiKey.Trim();
+                    req.Headers["HTTP-Referer"] = "https://github.com/ai2u-custom-ai";
+                    req.Headers["X-Title"] = "AI2U Custom AI";
+
+                    using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+                    using (System.IO.Stream s = resp.GetResponseStream())
+                    using (System.IO.StreamReader r = new System.IO.StreamReader(s, System.Text.Encoding.UTF8))
+                    {
+                        string json = r.ReadToEnd();
+                        if (!string.IsNullOrEmpty(json))
+                        {
+                            JToken root = JToken.Parse(json);
+                            JToken data = root["data"];
+                            JArray endpoints = null;
+                            if (data is JObject && ((JObject)data)["endpoints"] is JArray)
+                                endpoints = (JArray)((JObject)data)["endpoints"];
+                            else if (data is JArray)
+                                endpoints = (JArray)data;
+
+                            if (endpoints != null)
+                            {
+                                foreach (JToken ep in endpoints)
+                                {
+                                    string pName = ep["provider_name"] != null ? ep["provider_name"].ToString() : null;
+                                    if (string.IsNullOrEmpty(pName) && ep["tag"] != null)
+                                        pName = ep["tag"].ToString();
+                                    if (!string.IsNullOrEmpty(pName) && !found.Contains(pName))
+                                        found.Add(pName);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    err = ex.Message;
+                }
+                finally
+                {
+                    _fetchingProviders = false;
+                    if (found.Count > 0)
+                    {
+                        _providerList = found;
+                        _fetchProviderError = null;
+                    }
+                    else
+                    {
+                        _fetchProviderError = err != null ? err : "No specific endpoints returned for " + curModel;
+                    }
+                }
+            });
+        }
+
         // Numeric and text values are edited as strings so a half-typed number
         // never has to parse. They are committed to config on Save.
         static readonly Dictionary<string, string> _buf = new Dictionary<string, string>();
@@ -135,6 +430,13 @@ namespace AI2UCustomAI
         {
             if (IsOpen) return;
             IsOpen = true;
+
+            float targetW = Mathf.Min(1176f, Screen.width - 40f);
+            float targetH = Mathf.Min(924f, Screen.height - 40f);
+            _win.width = targetW;
+            _win.height = targetH;
+            _win.x = Mathf.Max(0f, (Screen.width - _win.width) * 0.5f);
+            _win.y = Mathf.Max(0f, (Screen.height - _win.height) * 0.5f);
 
             LoadBuffers();
             _status = null;
@@ -497,8 +799,7 @@ namespace AI2UCustomAI
             // screenshot showed: sentences cut off mid-word at the panel edge with a
             // horizontal scrollbar underneath.
             //
-            // Passing GUIStyle.none removes that scrollbar, which constrains the
-            // content to the visible width, which is what makes wordWrap do its job.
+            // Passing GUIStyle.none removes horizontal scrollbar so text wraps naturally
             _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUI.skin.verticalScrollbar);
 
             DrawTabIntro();
@@ -506,107 +807,277 @@ namespace AI2UCustomAI
             // ================= SETUP =========================================
             if (_tab == 0)
             {
-            Header("Endpoint");
-            GUILayout.Label("  Three boxes decide everything: where to send her lines, what key opens "
-                + "that door, and which model answers. Fill them in, press Test text, and she is "
-                + "yours. Everything on the other tabs already has a sane default.", sub);
-            TextRow("BaseUrl", "Base URL", 0f);
-            KeyRow("ApiKey", "API key");
-            TextRow("Model", "Model", 0f);
+                Header("Profiles");
+                GUILayout.BeginHorizontal();
+                Label("Active Profile");
+                for (int p = 1; p <= 3; p++)
+                {
+                    bool isActive = (ProfileManager.CurrentProfile == p);
+                    GUIStyle pBtnStyle = new GUIStyle(GUI.skin.button);
+                    pBtnStyle.fontSize = 12;
+                    if (isActive)
+                    {
+                        pBtnStyle.fontStyle = FontStyle.Bold;
+                        pBtnStyle.normal.textColor = Color.green;
+                    }
+                    string pLabel = (isActive ? "● Profile " : "○ Profile ") + p;
+                    if (GUILayout.Button(pLabel, pBtnStyle, GUILayout.Width(110f), GUILayout.Height(24f)))
+                    {
+                        if (ProfileManager.CurrentProfile != p)
+                        {
+                            ProfileManager.SwitchToProfile(p);
+                        }
+                    }
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                PlainNote("  Profiles remember your entire configuration (endpoints, models, prompts, voices, and settings) so you can switch setups in one click.");
 
-            Header("Test");
-            GUILayout.Label("  Both tests save first, so they check exactly what is in the boxes above. "
-                + "The text test asks your endpoint for one word and fixes the base URL if a nearby "
-                + "form is the one that answers. The voice test synthesises a line and plays it.", sub);
-            GUILayout.BeginHorizontal();
-            bool hitText = GUILayout.Button(_busyText ? "Testing..." : "Test text", GUILayout.Height(26f));
-            bool hitVoice = GUILayout.Button(_busyVoice ? "Testing..." : "Test voice", GUILayout.Height(26f));
-            GUILayout.EndHorizontal();
-            if (hitText && !_busyText) StartTest(false);
-            if (hitVoice && !_busyVoice) StartTest(true);
-            Result("Text", _resText, _resTextColor);
-            Result("Voice", _resVoice, _resVoiceColor);
+                Header("Endpoint");
+                GUILayout.Label("  Three boxes decide everything: where to send her lines, what key opens "
+                    + "that door, and which model answers. Fill them in, press Test text, and she is "
+                    + "yours. Everything on the other tabs already has a sane default.", sub);
 
-            DifficultySection();
+                // Quick preset buttons for popular API providers
+                GUILayout.BeginHorizontal();
+                Label("Easy URL");
+                GUIStyle easyBtnStyle = new GUIStyle(GUI.skin.button);
+                easyBtnStyle.fontSize = 11;
+                if (GUILayout.Button("OpenRouter", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://openrouter.ai/api/v1");
+                }
+                if (GUILayout.Button("OpenAI", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://api.openai.com/v1");
+                }
+                if (GUILayout.Button("DeepSeek", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://api.deepseek.com/v1");
+                }
+                if (GUILayout.Button("Groq", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://api.groq.com/openai/v1");
+                }
+                if (GUILayout.Button("Astropond", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://astropond.com/v1");
+                }
+                if (GUILayout.Button("Ollama", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("http://localhost:11434/v1");
+                }
+                if (GUILayout.Button("LM Studio", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("http://localhost:1234/v1");
+                }
+                if (GUILayout.Button("LinkAPI", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://api.linkapi.ai/v1");
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
 
-            Header("Game server");
-            Bool(Plugin.CfgBlockGameAi,
-                "Block the game's dialogue AI calls while the mod is on (play, fetchAsync)");
-            Bool(Plugin.CfgOwnExtras,
-                "Do summary / envision / memorize here too");
-            GUILayout.Label("  Both are AI2U's own paid LLM calls. The first is fully replaced by this mod, "
-                + "so blocking it costs you nothing and costs the developers nothing. The second covers "
-                + "the ending recap, her reaction to a painting or the TV, and the short memory of what "
-                + "you last talked about - with the box ticked those run on your endpoint in your model's "
-                + "voice, and untick it to hand them back to AI2U's servers. Login, saves, the shop and "
-                + "metrics are never touched.", sub);
-            GUILayout.Label("  Tradeoff while it is on: the ending gems and reward icons come from AI2U's "
-                + "reply to the summary call, so the ending screen shows the written recap without them.", sub);
+                TextRow("BaseUrl", "Base URL", 0f);
+                KeyRow("ApiKey", "API key");
+                ModelRowWithDropdown();
+                OpenRouterProviderRow();
 
-            Header("Debug");
-            Bool(Plugin.CfgLogPayloads, "Log request and reply payloads to the BepInEx console");
+                Header("Test");
+                GUILayout.Label("  Both tests save first, so they check exactly what is in the boxes above. "
+                    + "The text test asks your endpoint for one word and fixes the base URL if a nearby "
+                    + "form is the one that answers. The voice test synthesises a line and plays it.", sub);
+                GUILayout.BeginHorizontal();
+                bool hitText = GUILayout.Button(_busyText ? "Testing..." : "Test text", GUILayout.Height(26f));
+                bool hitVoice = GUILayout.Button(_busyVoice ? "Testing..." : "Test voice", GUILayout.Height(26f));
+                GUILayout.EndHorizontal();
+                if (hitText && !_busyText) StartTest(false);
+                if (hitVoice && !_busyVoice) StartTest(true);
+                Result("Text", _resText, _resTextColor);
+                Result("Voice", _resVoice, _resVoiceColor);
+
+                DifficultySection();
+
+                Header("Game server");
+                Bool(Plugin.CfgBlockGameAi,
+                    "Block the game's dialogue AI calls while the mod is on (play, fetchAsync)");
+                Bool(Plugin.CfgOwnExtras,
+                    "Do summary / envision / memorize here too");
+                GUILayout.Label("  Both are AI2U's own paid LLM calls. The first is fully replaced by this mod, "
+                    + "so blocking it costs you nothing and costs the developers nothing. The second covers "
+                    + "the ending recap, her reaction to a painting or the TV, and the short memory of what "
+                    + "you last talked about - with the box ticked those run on your endpoint in your model's "
+                    + "voice, and untick it to hand them back to AI2U's servers. Login, saves, the shop and "
+                    + "metrics are never touched.", sub);
+                GUILayout.Label("  Tradeoff while it is on: the ending gems and reward icons come from AI2U's "
+                    + "reply to the summary call, so the ending screen shows the written recap without them.", sub);
+
+                Header("Debug");
+                Bool(Plugin.CfgLogPayloads, "Log request and reply payloads to the BepInEx console");
             }
 
             // ================= VOICE =========================================
             if (_tab == 1)
             {
-            Header("Voice");
-            Bool(Plugin.CfgForceLocalVoice, "Force local Overtone voice (needed with a custom endpoint)");
-            Bool(Plugin.CfgGameServerTts, "Use the game's servers for TTS while the mod's TTS is off "
-                + "(with this off too, she is silent whenever the mod's TTS is off)");
+                Header("Voice Mode");
+                GUILayout.Label("  Click a mode below to select your text-to-speech engine:", sub);
 
-            // Unity stripped Overtone's synthesis methods from the Steam
-            // assembly, so on that build the toggle above cannot produce sound
-            // however it is set. Say so here rather than letting it look broken.
-            if (!Platform.LocalVoiceAvailable)
-                GUILayout.Label("  This build has no local voice engine - Unity stripped Overtone's "
-                    + "synthesis code from it, so the toggle above cannot make sound. Use a cloud TTS "
-                    + "provider below for her to have a voice.");
+                string curVoiceMode = Plugin.CfgVoiceChoice != null ? Plugin.CfgVoiceChoice.Value : "local";
+                bool isLocal = string.Equals(curVoiceMode, "local", StringComparison.OrdinalIgnoreCase);
+                bool isAzure = string.Equals(curVoiceMode, "azure", StringComparison.OrdinalIgnoreCase);
+                bool isCustom = string.Equals(curVoiceMode, "cloud", StringComparison.OrdinalIgnoreCase) || string.Equals(curVoiceMode, "custom", StringComparison.OrdinalIgnoreCase);
 
-            Bool(Plugin.CfgGrokEnabled, "Use a cloud TTS provider instead");
-            TextRow("TtsProvider", "Provider (xai / elevenlabs / openai)", 0f);
-            TextRow("GrokBaseUrl", "TTS base URL", 0f);
-            KeyRow("GrokApiKey", "TTS API key");
-            TextRow("TtsModel", "TTS model", 0f);
-            TextRow("GrokVoiceId", "Voice (used by anyone without her own below)", 0f);
-            FloatRow("TtsVolume", "Volume");
+                GUILayout.BeginHorizontal();
 
-            Header("Voice detail");
-            TextRow("GrokLanguage", "Language", 0f);
-            FloatRow("GrokSpeed", "Speed");
-            IntRow("GrokSampleRate", "Sample rate");
-            // These two labels were swapped for at least one release: the
-            // loudness label sat on the text-normalization toggle and vice
-            // versa, so flipping either did the other one's job.
-            Bool(Plugin.CfgGrokNormalize, "Expand numbers and abbreviations into words before speaking");
-            Bool(Plugin.CfgTtsNormalize, "Normalise loudness across voices");
-            Bool(Plugin.CfgSpeakActions, "Read *actions* aloud too (off: speak only her words)");
+                GUIStyle modeBtnActive = new GUIStyle(GUI.skin.button);
+                modeBtnActive.fontStyle = FontStyle.Bold;
+                modeBtnActive.normal.textColor = Color.green;
+                modeBtnActive.hover.textColor = Color.green;
+                modeBtnActive.active.textColor = Color.green;
 
-            PerCharacterVoices();
+                GUIStyle modeBtnInactive = new GUIStyle(GUI.skin.button);
+                modeBtnInactive.fontStyle = FontStyle.Normal;
+                modeBtnInactive.normal.textColor = new Color(0.75f, 0.75f, 0.75f);
+                modeBtnInactive.hover.textColor = Color.white;
+
+                if (GUILayout.Button(isLocal ? "● 1. Local Original (Offline)" : "○ 1. Local Original (Offline)", isLocal ? modeBtnActive : modeBtnInactive, GUILayout.Height(32f)))
+                {
+                    Plugin.CfgVoiceChoice.Value = "local";
+                    Plugin.CfgGameVoice.Value = true;
+                    Plugin.CfgGrokEnabled.Value = false;
+                    Plugin.SaveCfg();
+                    Note("Voice mode set to: Local Original (Offline Overtone - 0 API keys required)");
+                }
+
+                if (GUILayout.Button(isAzure ? "● 2. Cloud Original (Azure)" : "○ 2. Cloud Original (Azure)", isAzure ? modeBtnActive : modeBtnInactive, GUILayout.Height(32f)))
+                {
+                    Plugin.CfgVoiceChoice.Value = "azure";
+                    Plugin.CfgGameVoice.Value = true;
+                    Plugin.CfgGrokEnabled.Value = false;
+                    Plugin.SaveCfg();
+                    Note("Voice mode set to: Cloud Original (Azure Neural Speech)");
+                }
+
+                if (GUILayout.Button(isCustom ? "● 3. Custom Endpoint (Cloud TTS)" : "○ 3. Custom Endpoint (Cloud TTS)", isCustom ? modeBtnActive : modeBtnInactive, GUILayout.Height(32f)))
+                {
+                    Plugin.CfgVoiceChoice.Value = "cloud";
+                    Plugin.CfgGameVoice.Value = false;
+                    Plugin.CfgGrokEnabled.Value = true;
+                    Plugin.SaveCfg();
+                    Note("Voice mode set to: Custom Endpoint (xAI / ElevenLabs / OpenAI-style)");
+                }
+
+                GUILayout.EndHorizontal();
+
+                GUILayout.Space(8f);
+
+                // Option 1: Local Original Overtone
+                Header("1. Local Original Voice (Offline Overtone TTS)");
+                PlainNote("  The game's native on-device speech engine (Overtone) restored for all builds. "
+                    + "Completely offline, 0 API keys required. Characters speak with their authentic original voices "
+                    + "(Eddie/Evie/Eiona: Amy, Elysia: Cori, Estelle: HFC Female, Magic Circle: Cori-Ghost).");
+                if (isLocal)
+                {
+                    PlainNote("  Status: ACTIVE. (Running on-device; external cloud options below are disabled).");
+                }
+
+                GUILayout.Space(6f);
+
+                // Option 2: Cloud Original Azure
+                Header("2. Cloud Original Voice (Azure Neural Speech)");
+                PlainNote("  The original developer-curated neural cloud voice cast (Jane, Amber, Nancy, Davis with authentic prosody).");
+                PlainNote("  Why an Azure key is needed: AI2U's official game server only voices dialogue lines that its own LLM writes. Because your custom model writes new custom lines, speech is synthesized via Azure Neural Speech.");
+                PlainNote("  Microsoft Azure includes 500,000 characters/month completely FREE forever.");
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(14f);
+                if (GUILayout.Button("➜ Get Free Azure Speech Key (Opens Azure in Browser)", GUILayout.Height(24f), GUILayout.Width(380f)))
+                {
+                    Application.OpenURL("https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices");
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4f);
+
+                KeyRow("GameVoiceKey", "Azure Speech key", isAzure);
+                TextRow("GameVoiceRegion", "Azure Speech region", 0f, isAzure);
+                if (isAzure)
+                {
+                    if (string.IsNullOrEmpty(Get("GameVoiceKey")))
+                        PlainNote("  Status: Selected, but Azure Speech key is empty. Click the button above to get a free key, or switch to Local Original.");
+                    else
+                        PlainNote("  Status: ACTIVE (Azure Neural Speech).");
+                }
+
+                GUILayout.Space(6f);
+
+                // Option 3: Custom Cloud TTS Provider
+                Header("3. Custom Endpoint (Cloud TTS Provider)");
+                PlainNote("  Route speech synthesis through an external text-to-speech service.");
+                TextRow("TtsProvider", "Provider (auto / xai / elevenlabs / openai)", 0f, isCustom);
+                TextRow("GrokBaseUrl", "TTS base URL", 0f, isCustom);
+                KeyRow("GrokApiKey", "TTS API key", isCustom);
+                TextRow("TtsModel", "TTS model", 0f, isCustom);
+                TextRow("GrokVoiceId", "Voice (general fallback)", 0f, isCustom);
+                FloatRow("TtsVolume", "Volume", isCustom);
+
+                Header("Voice Detail & Tweaks");
+                TextRow("GrokLanguage", "Language", 0f, isCustom);
+                FloatRow("GrokSpeed", "Speed", isCustom);
+                IntRow("GrokSampleRate", "Sample rate", isCustom);
+                Bool(Plugin.CfgGrokNormalize, "Expand numbers and abbreviations into words before speaking", isCustom);
+                Bool(Plugin.CfgTtsNormalize, "Normalise loudness across voices", isCustom);
+                Bool(Plugin.CfgSpeakActions, "Read *actions* aloud too (off: speak only her words)", true);
+
+                PerCharacterVoices(isCustom || isAzure);
             }
 
             // ================= MODEL =========================================
             if (_tab == 2)
             {
-            Header("Sampling");
-            GUILayout.Label("  How the model itself is driven. The defaults suit every endpoint the mod "
-                + "has been tested against; change these only if your provider misbehaves.", sub);
-            FloatRow("Temperature", "Temperature");
-            IntRow("MaxTokens", "Max reply tokens");
-            IntRow("ReplyWordLimit", "Reply word limit (0 = as now)");
-            IntRow("RetriesOnBadJson", "Retries on bad JSON");
-            Bool(Plugin.CfgHideReasoning, "Hide reasoning (reasoning.exclude)");
-            Bool(Plugin.CfgJsonMode, "Force JSON mode (response_format)");
-            Bool(Plugin.CfgClampValues, "Repair out-of-range values in her reply");
-            GUILayout.Label("  Leave the repair on. It rewrites a value she invented into the nearest one "
-                + "the game actually understands, and it is also what discovers the game's own action and "
-                + "expression vocabulary to send her in the first place.", sub);
+                Header("Sampling");
+                GUILayout.Label("  How the model itself is driven. The defaults suit every endpoint the mod "
+                    + "has been tested against; change these only if your provider misbehaves.", sub);
+                FloatRow("Temperature", "Temperature");
+                IntRow("MaxTokens", "Max reply tokens");
+                IntRow("ReplyWordLimit", "Reply word limit (0 = as now)");
+                IntRow("RetriesOnBadJson", "Retries on bad JSON");
+                Bool(Plugin.CfgHideReasoning, "Hide reasoning (reasoning.exclude)");
+                Bool(Plugin.CfgJsonMode, "Force JSON mode (response_format)");
+                Bool(Plugin.CfgClampValues, "Repair out-of-range values in her reply");
+                GUILayout.Label("  Leave the repair on. It rewrites a value she invented into the nearest one "
+                    + "the game actually understands, and it is also what discovers the game's own action and "
+                    + "expression vocabulary to send her in the first place.", sub);
 
-            Header("Memory");
-            IntRow("HistoryMaxTokens", "Max memory tokens");
-            GUILayout.Label("  How much conversation she keeps before the game drops her oldest lines. "
-                + "This overrides the game's own 3072 cap. It is a ceiling, not a reservation - cost "
-                + "only grows as the history fills. Keep it under your model's context window.", sub);
+                Header("Local Model Optimization (Ollama / LM Studio)");
+                Bool(Plugin.CfgLocalModelMode, "Optimize prompts for Local AI models (minimal context / fast replies)");
+                if (Plugin.CfgLocalModelMode != null && Plugin.CfgLocalModelMode.Value)
+                {
+                    GUILayout.BeginVertical(GUI.skin.box);
+                    GUIStyle warnHead = new GUIStyle(GUI.skin.label);
+                    warnHead.fontStyle = FontStyle.Bold;
+                    warnHead.normal.textColor = DangerRed;
+                    GUILayout.Label("⚠ Warning: Local Model Optimization Mode Active", warnHead);
+
+                    GUIStyle warnBody = new GUIStyle(GUI.skin.label);
+                    warnBody.wordWrap = true;
+                    warnBody.normal.textColor = new Color(1f, 0.72f, 0.72f);
+                    GUILayout.Label("  This mode drastically condenses and strips all system prompts, lore, and context history "
+                        + "into a single lightweight, ultra-compact message (~120 tokens) to prevent smaller local models "
+                        + "(e.g. 7B/8B/14B Ollama or LM Studio models) from hallucinating, lagging, or repeating greeting loops.\n"
+                        + "  NOTE: This is the mod author's best attempt at optimization and not much effort or testing has been "
+                        + "put into it since the author doesn't use local models, so use at your own risk if you want to toggle while using local models.", warnBody);
+                    GUILayout.EndVertical();
+                }
+                else
+                {
+                    PlainNote("  Heavily simplifies system prompts and trims history for small/quantized local LLMs (Ollama, LM Studio, GGUF). Disabled by default.");
+                }
+
+                Header("Memory");
+                IntRow("HistoryMaxTokens", "Max memory tokens");
+                GUILayout.Label("  How much conversation she keeps before the game drops her oldest lines. "
+                    + "This overrides the game's own 3072 cap. It is a ceiling, not a reservation - cost "
+                    + "only grows as the history fills. Keep it under your model's context window.", sub);
             }
 
             // ================= WHAT SHE KNOWS ================================
@@ -881,7 +1352,52 @@ namespace AI2UCustomAI
                 GUILayout.Label("Toggles apply the moment you click them. Text and numbers apply on Save.");
 
             GUILayout.EndArea();
-            GUI.DragWindow(new Rect(0f, 0f, _win.width, 40f));
+
+            HandleWindowResize();
+            GUI.DragWindow(new Rect(0f, 0f, _win.width - 40f, 40f));
+        }
+
+        static void HandleWindowResize()
+        {
+            Rect gripRect = new Rect(_win.width - 24f, _win.height - 24f, 24f, 24f);
+            GUIStyle gripStyle = new GUIStyle(GUI.skin.label);
+            gripStyle.fontSize = 15;
+            gripStyle.fontStyle = FontStyle.Bold;
+            gripStyle.normal.textColor = new Color(0.75f, 0.80f, 0.90f, 0.85f);
+            gripStyle.alignment = TextAnchor.MiddleCenter;
+            GUI.Label(gripRect, "◢", gripStyle);
+
+            Event e = Event.current;
+            if (e == null) return;
+
+            int controlId = GUIUtility.GetControlID(FocusType.Passive);
+            EventType eventType = e.GetTypeForControl(controlId);
+
+            if (eventType == EventType.MouseDown && gripRect.Contains(e.mousePosition) && e.button == 0)
+            {
+                GUIUtility.hotControl = controlId;
+                _isResizing = true;
+                _resizeStartMouse = GUIUtility.GUIToScreenPoint(e.mousePosition);
+                _resizeStartSize = new Vector2(_win.width, _win.height);
+                e.Use();
+            }
+            else if (eventType == EventType.MouseDrag && GUIUtility.hotControl == controlId && _isResizing)
+            {
+                Vector2 mouseScreen = GUIUtility.GUIToScreenPoint(e.mousePosition);
+                float deltaX = mouseScreen.x - _resizeStartMouse.x;
+                float deltaY = mouseScreen.y - _resizeStartMouse.y;
+                float newW = Mathf.Clamp(_resizeStartSize.x + deltaX, 750f, Screen.width - 10f);
+                float newH = Mathf.Clamp(_resizeStartSize.y + deltaY, 520f, Screen.height - 10f);
+                _win.width = newW;
+                _win.height = newH;
+                e.Use();
+            }
+            else if (eventType == EventType.MouseUp && GUIUtility.hotControl == controlId)
+            {
+                GUIUtility.hotControl = 0;
+                _isResizing = false;
+                e.Use();
+            }
         }
 
         static void Note(string s)
@@ -1065,8 +1581,9 @@ namespace AI2UCustomAI
                 TabIntro("Where her replies come from, and whether the game's own paid AI calls "
                     + "are blocked while yours is on.");
             else if (_tab == 1)
-                TabIntro("How she is voiced. The mod can use the game's local engine, its servers, "
-                    + "or a cloud provider of your own.");
+                TabIntro("How she is voiced. The mod can use the game's local engine, the game's "
+                    + "own original voice cast through your Azure key, or a cloud provider of "
+                    + "your own.");
             else if (_tab == 2)
                 TabIntro("How the model is driven, and how much of the conversation she keeps. "
                     + "The defaults suit every endpoint the mod has been tested against.");
@@ -1106,74 +1623,12 @@ namespace AI2UCustomAI
                 + "those ship on, under the tabs above.");
         }
 
-        // The collapsed Advanced section's own header, which is a button.
-        //
-        // Carries a count of how many settings inside differ from their defaults.
-        // Without it, collapsing is a trap: someone who changed a retry count
-        // months ago has no way to know the section is hiding it, and "the mod is
-        // behaving oddly" becomes unanswerable. The count makes the section
-        // honest about concealing state.
-        static void AdvancedHeader()
-        {
-            GUILayout.Space(12f);
-
-            int changed = ChangedAdvancedCount();
-            string arrow = Plugin.CfgShowAdvanced.Value ? "v" : ">";
-            string label = arrow + "  Advanced settings";
-            if (changed > 0)
-                label += "   (" + changed + " changed from default)";
-
-            GUIStyle s = new GUIStyle(GUI.skin.button);
-            s.fontStyle = FontStyle.Bold;
-            s.alignment = TextAnchor.MiddleLeft;
-            s.padding = new RectOffset(10, 10, 6, 6);
-
-            if (GUILayout.Button(label, s))
-            {
-                Plugin.CfgShowAdvanced.Value = !Plugin.CfgShowAdvanced.Value;
-                Plugin.SaveCfg();
-            }
-
-            if (!Plugin.CfgShowAdvanced.Value)
-            {
-                GUIStyle sub = new GUIStyle(GUI.skin.label);
-                sub.fontSize = 11;
-                sub.wordWrap = true;
-                sub.normal.textColor = new Color(0.62f, 0.66f, 0.72f);
-                GUILayout.Label("  "
-#if CANALPA
-                    + "Canalpa mode, "
-#endif
-                    + "sampling, memory, the danger toggles, the developer "
-                    + "channel, per-character voices and logging. All of it is either off by default "
-                    + "or already right for most people.", sub);
-            }
-        }
-
-        // Every setting that lives inside the Advanced section, so the count above
-        // reflects exactly what is being hidden - no more, no less.
-        static ConfigEntryBase[] AdvancedEntries()
-        {
-            return new ConfigEntryBase[]
-            {
-#if CANALPA
-                Plugin.CfgCanalpaMode, Plugin.CfgCanalpaSecretRoom,
-                Plugin.CfgCanalpaBasement, Plugin.CfgCanalpaClearance,
-                Plugin.CfgCanalpaHiddenIsland, Plugin.CfgCanalpaWillingEnd,
-#endif
-                Plugin.CfgTemperature, Plugin.CfgMaxTokens, Plugin.CfgReplyWordLimit,
-                Plugin.CfgRetries,
-                Plugin.CfgHideReasoning, Plugin.CfgJsonMode, Plugin.CfgClampValues,
-                Plugin.CfgHistoryMaxTokens,
-                Plugin.CfgAiCanMurder, Plugin.CfgTestKillPhraseActive, Plugin.CfgTestKillPhrase,
-                Plugin.CfgOocEnabled, Plugin.CfgOocTag,
-                Plugin.CfgTimeskipEnabled, Plugin.CfgTimeskipTag, Plugin.CfgActionsAreReal,
-                Plugin.CfgBlockGameAi, Plugin.CfgOwnExtras,
-                Plugin.CfgGrokLanguage, Plugin.CfgGrokSpeed, Plugin.CfgGrokSampleRate,
-                Plugin.CfgGrokNormalize, Plugin.CfgTtsNormalize, Plugin.CfgSpeakActions,
-                Plugin.CfgLogPayloads,
-            };
-        }
+        // The Advanced-collapse design this panel abandoned in 4.1 (tabs replaced
+        // it) survived here as three dead functions and a config entry for four
+        // more versions. Deleted in 5.3: AdvancedHeader was never called, so its
+        // count, its entry list and CfgShowAdvanced were all unreachable - and an
+        // entry list nobody draws is exactly the kind of thing that silently
+        // drifts from the panel it claims to describe.
 
         // "Set to default" is per tab, so it can never be a whole-panel wipe that the
         // person did not ask for. It is also deliberately incomplete: the settings
@@ -1202,9 +1657,12 @@ namespace AI2UCustomAI
                     Plugin.CfgCustomFavorabilityPercent, Plugin.CfgBlockGameAi,
                     Plugin.CfgOwnExtras, Plugin.CfgLogPayloads,
                 };
+                // CfgGameVoiceKey and CfgGameVoiceRegion are deliberately absent:
+                // the key is a fetched credential (same protection as every other
+                // key), and the region belongs to that credential.
                 case 1: return new ConfigEntryBase[]
                 {
-                    Plugin.CfgForceLocalVoice, Plugin.CfgGameServerTts,
+                    Plugin.CfgForceLocalVoice, Plugin.CfgGameVoice,
                     Plugin.CfgGrokEnabled, Plugin.CfgTtsVolume, Plugin.CfgGrokLanguage,
                     Plugin.CfgGrokSpeed, Plugin.CfgGrokSampleRate,
                     Plugin.CfgGrokNormalize, Plugin.CfgTtsNormalize,
@@ -1281,38 +1739,6 @@ namespace AI2UCustomAI
             else
                 Note(TabNames[_tab] + ": " + changed + (changed == 1 ? " setting" : " settings")
                     + " set to default. Your endpoints, keys and voices were left alone.");
-        }
-
-        static int ChangedAdvancedCount()
-        {
-            int n = 0;
-            try
-            {
-                ConfigEntryBase[] all = AdvancedEntries();
-                for (int i = 0; i < all.Length; i++)
-                {
-                    ConfigEntryBase e = all[i];
-                    if (e == null || e.DefaultValue == null) continue;
-
-                    object cur = e.BoxedValue;
-                    if (cur == null) continue;
-
-                    // ToString rather than Equals: the boxed values are a mix of
-                    // bool, int, float and string, and boxed floats do not compare
-                    // reliably by reference or by Equals across a config round-trip.
-                    if (cur.ToString() != e.DefaultValue.ToString()) n++;
-                }
-
-                // Per-character voices are dynamic, so they are counted by walking
-                // the same table the panel builds its rows from.
-                for (int i = 0; i < Voices.Names.Length; i++)
-                {
-                    ConfigEntry<string> v = Voices.Entry(Voices.Names[i]);
-                    if (v != null && !string.IsNullOrEmpty(v.Value)) n++;
-                }
-            }
-            catch (Exception) { return n; }
-            return n;
         }
 
         static readonly Color DangerRed = new Color(1f, 0.30f, 0.30f, 1f);
@@ -1689,7 +2115,7 @@ namespace AI2UCustomAI
         // because those are account settings and a second key is just a second
         // bill. An empty row inherits the general voice above, which keeps the
         // fallback something the user has definitely configured.
-        static void PerCharacterVoices()
+        static void PerCharacterVoices(bool enabled = true)
         {
             GUILayout.Space(8f);
             Header("Voice per character");
@@ -1701,13 +2127,8 @@ namespace AI2UCustomAI
                     : set + " of " + Voices.Names.Length + " have their own."));
 
             for (int i = 0; i < Voices.Names.Length; i++)
-                TextRow(VoicePrefix + Voices.Names[i], Voices.Labels[i], 0f);
+                TextRow(VoicePrefix + Voices.Names[i], Voices.Labels[i], 0f, enabled);
 
-            // Deliberately says nothing about which scenes exist or what happens
-            // in them. An earlier version of this note explained the routing by
-            // describing a late-game puzzle, which spoiled it for anyone who read
-            // the panel before playing that far. The routing needs no explanation
-            // to be used: a voice follows the character it is set for, everywhere.
             PlainNote("  A voice set here follows that character wherever she appears.");
         }
 
@@ -2073,6 +2494,251 @@ namespace AI2UCustomAI
 
 
 
+        static string TextFieldWithPlaceholder(string text, string placeholder, float width = 340f, bool enabled = true)
+        {
+            if (text == null) text = string.Empty;
+            string next = GUILayout.TextField(text, GUILayout.Width(width), GUILayout.Height(22f));
+
+            if (string.IsNullOrEmpty(next))
+            {
+                Rect r = GUILayoutUtility.GetLastRect();
+                if (r.width > 2f && r.height > 2f)
+                {
+                    GUIStyle phStyle = new GUIStyle(GUI.skin.label);
+                    phStyle.normal.textColor = new Color(0.58f, 0.62f, 0.68f, 0.45f);
+                    phStyle.fontStyle = FontStyle.Italic;
+                    phStyle.fontSize = GUI.skin.textField.fontSize;
+                    phStyle.padding = new RectOffset(6, 0, 2, 0);
+                    GUI.Label(r, placeholder, phStyle);
+                }
+            }
+            return next;
+        }
+
+        static string PasswordFieldWithPlaceholder(string text, string placeholder, float width = 340f, bool enabled = true)
+        {
+            if (text == null) text = string.Empty;
+            string next;
+            if (_showKeys)
+                next = GUILayout.TextField(text, GUILayout.Width(width), GUILayout.Height(22f));
+            else
+                next = GUILayout.PasswordField(text, '*', GUILayout.Width(width), GUILayout.Height(22f));
+
+            if (string.IsNullOrEmpty(next))
+            {
+                Rect r = GUILayoutUtility.GetLastRect();
+                if (r.width > 2f && r.height > 2f)
+                {
+                    GUIStyle phStyle = new GUIStyle(GUI.skin.label);
+                    phStyle.normal.textColor = new Color(0.58f, 0.62f, 0.68f, 0.45f);
+                    phStyle.fontStyle = FontStyle.Italic;
+                    phStyle.fontSize = GUI.skin.textField.fontSize;
+                    phStyle.padding = new RectOffset(6, 0, 2, 0);
+                    GUI.Label(r, placeholder, phStyle);
+                }
+            }
+            return next;
+        }
+
+        static void ModelRowWithDropdown()
+        {
+            GUILayout.BeginHorizontal();
+            Label("Model");
+            string curModel = Get("Model");
+            string nextModel = TextFieldWithPlaceholder(curModel, "e.g. google/gemini-3.7-flash", 260f, true);
+            _buf["Model"] = nextModel;
+            DefaultTag("Model");
+
+            string fetchLabel = _fetchingModels ? "Fetching..." : "↻ Fetch Models";
+            if (GUILayout.Button(fetchLabel, GUILayout.Width(115f), GUILayout.Height(22f)))
+            {
+                _modelDropdownOpen = true;
+                FetchModelsAsync();
+            }
+
+            string dropLabel = _modelDropdownOpen ? "▲ Close" : (_modelList.Count > 0 ? "▼ Models (" + _modelList.Count + ")" : "▼ Models");
+            if (GUILayout.Button(dropLabel, GUILayout.Width(95f), GUILayout.Height(22f)))
+            {
+                _modelDropdownOpen = !_modelDropdownOpen;
+            }
+            GUILayout.EndHorizontal();
+
+            if (_modelDropdownOpen)
+            {
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Search:", GUILayout.Width(50f));
+                _modelSearchQuery = TextFieldWithPlaceholder(_modelSearchQuery, "Search...", 320f, true);
+                if (GUILayout.Button("↻ Refresh", GUILayout.Width(80f), GUILayout.Height(22f)))
+                {
+                    FetchModelsAsync();
+                }
+                if (GUILayout.Button("✕", GUILayout.Width(28f), GUILayout.Height(22f)))
+                {
+                    _modelDropdownOpen = false;
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+
+                if (_fetchingModels)
+                {
+                    GUIStyle waitStyle = new GUIStyle(GUI.skin.label);
+                    waitStyle.normal.textColor = new Color(0.7f, 0.85f, 1f);
+                    GUILayout.Label("  Fetching models from endpoint...", waitStyle);
+                }
+                else if (!string.IsNullOrEmpty(_fetchModelError) && _modelList.Count == 0)
+                {
+                    GUIStyle errStyle = new GUIStyle(GUI.skin.label);
+                    errStyle.normal.textColor = DangerRed;
+                    GUILayout.Label("  " + _fetchModelError, errStyle);
+                }
+                else if (_modelList.Count > 0)
+                {
+                    _modelScroll = GUILayout.BeginScrollView(_modelScroll, GUILayout.Height(180f));
+                    int matched = 0;
+                    for (int mIdx = 0; mIdx < _modelList.Count; mIdx++)
+                    {
+                        string mName = _modelList[mIdx];
+                        if (!string.IsNullOrEmpty(_modelSearchQuery) && mName.IndexOf(_modelSearchQuery, StringComparison.OrdinalIgnoreCase) < 0)
+                            continue;
+
+                        matched++;
+                        bool isSelected = string.Equals(mName, curModel, StringComparison.OrdinalIgnoreCase);
+                        GUIStyle mBtnStyle = new GUIStyle(GUI.skin.button);
+                        mBtnStyle.alignment = TextAnchor.MiddleLeft;
+                        if (isSelected)
+                        {
+                            mBtnStyle.fontStyle = FontStyle.Bold;
+                            mBtnStyle.normal.textColor = Color.green;
+                        }
+
+                        if (GUILayout.Button((isSelected ? "✔ " : "   ") + mName, mBtnStyle, GUILayout.Height(22f)))
+                        {
+                            _buf["Model"] = mName;
+                            Plugin.CfgModel.Value = mName;
+                            Plugin.SaveCfg();
+                            Note("Selected model: " + mName);
+                            _modelDropdownOpen = false;
+                            if (IsOpenRouterBaseUrl())
+                            {
+                                _providerList.Clear();
+                                FetchProvidersAsync();
+                            }
+                        }
+                    }
+                    if (matched == 0)
+                    {
+                        GUIStyle noneStyle = new GUIStyle(GUI.skin.label);
+                        noneStyle.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
+                        GUILayout.Label("  No models matching '" + _modelSearchQuery + "'", noneStyle);
+                    }
+                    GUILayout.EndScrollView();
+                }
+                GUILayout.EndVertical();
+            }
+        }
+
+        static void OpenRouterProviderRow()
+        {
+            bool isOpenRouter = IsOpenRouterBaseUrl();
+
+            GUILayout.BeginHorizontal();
+            bool wasEnabled = GUI.enabled;
+            Color wasColor = GUI.color;
+            if (!isOpenRouter)
+            {
+                GUI.enabled = false;
+                GUI.color = new Color(wasColor.r, wasColor.g, wasColor.b, 0.45f);
+            }
+
+            Label("OpenRouter provider");
+            string curP = Get("OpenRouterProvider");
+            string nextP = TextFieldWithPlaceholder(curP, "auto / Anthropic / Together / etc.", 340f, isOpenRouter);
+            if (isOpenRouter) _buf["OpenRouterProvider"] = nextP;
+
+            string provBtnLabel = _fetchingProviders ? "Fetching..." : "↻ Fetch Providers";
+            if (GUILayout.Button(provBtnLabel, GUILayout.Width(130f), GUILayout.Height(22f)))
+            {
+                FetchProvidersAsync();
+            }
+
+            GUI.enabled = wasEnabled;
+            GUI.color = wasColor;
+            GUILayout.EndHorizontal();
+
+            Bool(Plugin.CfgOpenRouterAllowFallback, "OpenRouter allow provider fallbacks", isOpenRouter);
+
+            if (!isOpenRouter)
+            {
+                PlainNote("  (OpenRouter provider routing is only active when Base URL is set to OpenRouter)");
+                return;
+            }
+
+            if (_fetchingProviders)
+            {
+                GUIStyle waitStyle = new GUIStyle(GUI.skin.label);
+                waitStyle.normal.textColor = new Color(0.7f, 0.85f, 1f);
+                GUILayout.Label("  Fetching supported providers for " + (_lastFetchedProviderModel ?? "model") + "...", waitStyle);
+            }
+            else if (!string.IsNullOrEmpty(_fetchProviderError))
+            {
+                GUIStyle errStyle = new GUIStyle(GUI.skin.label);
+                errStyle.normal.textColor = new Color(1f, 0.6f, 0.6f);
+                GUILayout.Label("  " + _fetchProviderError, errStyle);
+            }
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(214f);
+            GUIStyle badgeStyle = new GUIStyle(GUI.skin.button);
+            badgeStyle.fontSize = 11;
+            string curVal = Get("OpenRouterProvider");
+
+            List<string> listToDisplay = new List<string>();
+            listToDisplay.Add("auto");
+
+            if (_providerList != null && _providerList.Count > 0)
+            {
+                for (int i = 0; i < _providerList.Count; i++)
+                {
+                    if (!listToDisplay.Contains(_providerList[i]))
+                        listToDisplay.Add(_providerList[i]);
+                }
+            }
+            else
+            {
+                string[] defaults = { "Anthropic", "Together", "DeepInfra", "Hyperbolic", "Groq", "Fireworks" };
+                for (int i = 0; i < defaults.Length; i++) listToDisplay.Add(defaults[i]);
+            }
+
+            int buttonsInRow = 0;
+            for (int q = 0; q < listToDisplay.Count; q++)
+            {
+                string pName = listToDisplay[q];
+                bool isCur = string.Equals(curVal, pName, StringComparison.OrdinalIgnoreCase) || (string.IsNullOrEmpty(curVal) && pName == "auto");
+                if (isCur) badgeStyle.fontStyle = FontStyle.Bold;
+                else badgeStyle.fontStyle = FontStyle.Normal;
+
+                if (GUILayout.Button(pName, badgeStyle, GUILayout.Height(20f)))
+                {
+                    _buf["OpenRouterProvider"] = pName;
+                    Plugin.CfgOpenRouterProvider.Value = pName;
+                    Plugin.SaveCfg();
+                    Note("OpenRouter provider set to: " + pName);
+                }
+                buttonsInRow++;
+                if (buttonsInRow >= 7 && q < listToDisplay.Count - 1)
+                {
+                    GUILayout.FlexibleSpace();
+                    GUILayout.EndHorizontal();
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(214f);
+                    buttonsInRow = 0;
+                }
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+
         static void TextRow(string key, string label, float unused)
         {
             TextRow(key, label, unused, true);
@@ -2096,7 +2762,13 @@ namespace AI2UCustomAI
             Label(label);
 
             string cur = Get(key);
-            string next = GUILayout.TextField(cur);
+            string ph = "";
+            if (key == "BaseUrl") ph = "https://openrouter.ai/api/v1";
+            else if (key == "GameVoiceRegion") ph = "eastus / westus2 / etc.";
+            else if (key == "GrokBaseUrl") ph = "https://api.x.ai/v1";
+            else if (key == "GrokLanguage") ph = "en";
+
+            string next = TextFieldWithPlaceholder(cur, ph, 340f, enabled);
             // Committing the buffer only while enabled means a disabled field can
             // never write back a value, whatever the skin does with the keyboard.
             if (enabled) _buf[key] = next;
@@ -2111,43 +2783,79 @@ namespace AI2UCustomAI
 
         // Keys are masked by default so the panel is safe to have on screen while
         // recording or streaming.
-        static void KeyRow(string key, string label)
+        static void KeyRow(string key, string label, bool enabled = true)
         {
             GUILayout.BeginHorizontal();
+            bool wasEnabled = GUI.enabled;
+            Color wasColor = GUI.color;
+            if (!enabled)
+            {
+                GUI.enabled = false;
+                GUI.color = new Color(wasColor.r, wasColor.g, wasColor.b, 0.45f);
+            }
+
             Label(label);
             string cur = Get(key);
-            if (_showKeys) _buf[key] = GUILayout.TextField(cur);
-            else _buf[key] = GUILayout.PasswordField(cur, '*');
+            string ph = key.Contains("GameVoice") ? "Enter Key" : "Enter Key...";
+            string next = PasswordFieldWithPlaceholder(cur, ph, 340f, enabled);
+            if (enabled) _buf[key] = next;
             _showKeys = GUILayout.Toggle(_showKeys, "show", GUILayout.Width(56f));
+
+            GUI.enabled = wasEnabled;
+            GUI.color = wasColor;
             GUILayout.EndHorizontal();
         }
 
-        static void IntRow(string key, string label)
+        static void IntRow(string key, string label, bool enabled = true)
         {
             GUILayout.BeginHorizontal();
+            bool wasEnabled = GUI.enabled;
+            Color wasColor = GUI.color;
+            if (!enabled)
+            {
+                GUI.enabled = false;
+                GUI.color = new Color(wasColor.r, wasColor.g, wasColor.b, 0.45f);
+            }
+
             Label(label);
-            _buf[key] = GUILayout.TextField(Get(key), GUILayout.Width(140f));
+            string cur = Get(key);
+            string next = GUILayout.TextField(cur, GUILayout.Width(140f));
+            if (enabled) _buf[key] = next;
             DefaultTag(key);
             GUILayout.FlexibleSpace();
+
+            GUI.enabled = wasEnabled;
+            GUI.color = wasColor;
             GUILayout.EndHorizontal();
         }
 
-        static void FloatRow(string key, string label)
+        static void FloatRow(string key, string label, bool enabled = true)
         {
-            IntRow(key, label);
+            IntRow(key, label, enabled);
         }
 
-        static void Bool(ConfigEntry<bool> cfg, string label)
+        static void Bool(ConfigEntry<bool> cfg, string label, bool enabled = true)
         {
             if (cfg == null) return;
+            bool wasEnabled = GUI.enabled;
+            Color wasColor = GUI.color;
+            if (!enabled)
+            {
+                GUI.enabled = false;
+                GUI.color = new Color(wasColor.r, wasColor.g, wasColor.b, 0.45f);
+            }
+
             bool before = cfg.Value;
             bool after = GUILayout.Toggle(before, "  " + label + BoolDefaultSuffix(cfg));
-            if (after != before)
+            if (enabled && after != before)
             {
                 cfg.Value = after;
                 Plugin.SaveCfg();
                 Note(label + (after ? ": on" : ": off"));
             }
+
+            GUI.enabled = wasEnabled;
+            GUI.color = wasColor;
         }
 
         static string Get(string key)
@@ -2169,9 +2877,9 @@ namespace AI2UCustomAI
         {
             string[] fixedKeys =
             {
-                "BaseUrl", "ApiKey", "Model", "TtsProvider", "GrokBaseUrl",
+                "BaseUrl", "ApiKey", "Model", "OpenRouterProvider", "TtsProvider", "GrokBaseUrl",
                 "GrokApiKey", "TtsModel", "GrokVoiceId", "GrokLanguage", "TestKillPhrase",
-                "OocTag", "TimeskipTag"
+                "OocTag", "TimeskipTag", "GameVoiceKey", "GameVoiceRegion"
             };
 
             string[] all = new string[fixedKeys.Length + Voices.Names.Length];
@@ -2198,6 +2906,7 @@ namespace AI2UCustomAI
                 case "BaseUrl": return Plugin.CfgBaseUrl;
                 case "ApiKey": return Plugin.CfgApiKey;
                 case "Model": return Plugin.CfgModel;
+                case "OpenRouterProvider": return Plugin.CfgOpenRouterProvider;
                 case "TtsProvider": return Plugin.CfgTtsProvider;
                 case "GrokBaseUrl": return Plugin.CfgGrokBaseUrl;
                 case "GrokApiKey": return Plugin.CfgGrokApiKey;
@@ -2207,6 +2916,8 @@ namespace AI2UCustomAI
                 case "TestKillPhrase": return Plugin.CfgTestKillPhrase;
                 case "OocTag": return Plugin.CfgOocTag;
                 case "TimeskipTag": return Plugin.CfgTimeskipTag;
+                case "GameVoiceKey": return Plugin.CfgGameVoiceKey;
+                case "GameVoiceRegion": return Plugin.CfgGameVoiceRegion;
             }
             return null;
         }
@@ -2366,11 +3077,32 @@ namespace AI2UCustomAI
             Plugin.SaveCfg();
             LoadBuffers();
 
+            try
+            {
+                ProfileManager.SaveProfile(ProfileManager.CurrentProfile);
+            }
+            catch (Exception) { }
+
             if (bad.Count == 0)
                 Note("Saved. Takes effect on her next reply - no restart.");
             else
                 Note("Saved, but these were not numbers and kept their old values: "
                     + string.Join(", ", bad.ToArray()));
+        }
+
+        public static void CommitChanges()
+        {
+            Commit();
+        }
+
+        public static void ReloadFromProfile()
+        {
+            LoadBuffers();
+        }
+
+        public static void PostNote(string text)
+        {
+            Note(text);
         }
     }
 }

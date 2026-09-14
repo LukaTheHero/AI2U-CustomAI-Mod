@@ -396,12 +396,19 @@ namespace AI2UCustomAI
         {
             sb.Append("\nHow npc_reply_to_player is processed before the player sees it:\n");
 
-            // NPCMasterBehavior_MainCharacter.cs:936 voids the turn on a bracket,
-            // and Communicator.cs:409 starts the final chase on the second void.
+            // NPCMasterBehavior_MainCharacter.cs:936 voids the turn on a bracket.
+            //
+            // Deliberately NOT the old "second discard starts a permanent hunt"
+            // claim, which shipped in three releases and is false: the strike
+            // counter behind that threshold (aiCensorCounter) is reset on every
+            // reply that arrives at all (Communicator.cs:248), so bracket voids
+            // can never accumulate to it - only full transport failures can, and
+            // TransportStrikeGuard already withdraws those. The channel this text
+            // feeds is also required to be literally truthful in OOC mode, so a
+            // scary exaggeration here is a lie she would repeat as fact.
             sb.Append("- NEVER use a square bracket. The game discards the entire reply if the ");
-            sb.Append("text contains [ or ], and after the second discarded reply it puts the NPC ");
-            sb.Append("into a permanent hunt for the player. Nothing you gain from a bracket is ");
-            sb.Append("worth that.\n");
+            sb.Append("text contains [ or ] - the player sees a canned placeholder line instead ");
+            sb.Append("of anything you wrote, and the whole turn is wasted.\n");
 
             // NPCMasterBehavior_MainCharacter.cs:941-966.
             sb.Append("- Round brackets are deleted along with everything inside them, so stage ");

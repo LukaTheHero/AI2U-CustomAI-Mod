@@ -17,10 +17,10 @@ using LeastSquares.Overtone;
 
 namespace AI2UCustomAI
 {
-    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.4.0")]
+    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.5.0")]
     public class Plugin : BaseUnityPlugin
     {
-        public const string VERSION = "5.4.0";
+        public const string VERSION = "5.5.0";
 
         // The old URL was a placeholder twice over: the repository did not exist
         // AND the account name was wrong, so it could never have resolved. It
@@ -2975,6 +2975,13 @@ namespace AI2UCustomAI
             string url = CombineUrl(Plugin.CfgBaseUrl.Value, "chat/completions");
             string body = BuildRequest(history, image, imageNote);
 
+            // Google speaks a different schema, so the request just built is
+            // rebuilt into it. JSON mode is forced on this path rather than
+            // following CfgJsonMode: every dialogue reply is JSON by contract,
+            // and on gemini-3.8-flash the JSON mime is additionally the thing
+            // that makes the thinking budget take effect at all.
+            if (Google.Active) body = Google.Body(body, true);
+
             if (Plugin.CfgLogPayloads.Value)
                 Plugin.Log.LogInfo("--> " + url + "\n" + Trim(body, 4000));
 
@@ -2987,10 +2994,7 @@ namespace AI2UCustomAI
                 byte[] payload = Encoding.UTF8.GetBytes(body);
                 req.uploadHandler = new UploadHandlerRaw(payload);
                 req.downloadHandler = new DownloadHandlerBuffer();
-                req.SetRequestHeader("Content-Type", "application/json");
-                req.SetRequestHeader("Authorization", "Bearer " + Plugin.CfgApiKey.Value);
-                req.SetRequestHeader("HTTP-Referer", "https://github.com/ai2u-custom-ai");
-                req.SetRequestHeader("X-Title", "AI2U Custom AI");
+                Auth(req);
 
                 yield return req.SendWebRequest();
 
@@ -3007,6 +3011,11 @@ namespace AI2UCustomAI
 
                 if (Plugin.CfgLogPayloads.Value)
                     Plugin.Log.LogInfo("<-- " + Trim(raw, 4000));
+
+                // Back into the OpenAI shape before anything below reads it,
+                // so the parser, the repair pass and the token accounting never
+                // learn that this turn came from Google.
+                if (Google.Active) raw = Google.Normalize(raw, Plugin.CfgModel.Value);
 
                 string content = null;
                 int completionTokens = 0;
@@ -3167,7 +3176,10 @@ namespace AI2UCustomAI
 
             // Same reason as the dialogue path: a reasoning model otherwise spends
             // the whole budget thinking and returns an empty content string.
-            if (Plugin.CfgHideReasoning.Value)
+            // OpenRouter only - see IsOpenRouterEndpoint. Everywhere else the
+            // reasoning models either hide their thinking already or expose a
+            // differently-named control, and an unknown field is a 400.
+            if (Plugin.CfgHideReasoning.Value && IsOpenRouterEndpoint())
             {
                 JObject reasoning = new JObject();
                 reasoning["exclude"] = true;
@@ -3180,11 +3192,18 @@ namespace AI2UCustomAI
                 root["response_format"] = rf;
             }
 
-            JObject usageOpt = new JObject();
-            usageOpt["include"] = true;
-            root["usage"] = usageOpt;
+            // Also OpenRouter-only. This was the one unconditional extension
+            // field left: the dialogue path already asked for usage inside
+            // ApplyOpenRouterParams, but the side calls asked every provider.
+            if (IsOpenRouterEndpoint())
+            {
+                JObject usageOpt = new JObject();
+                usageOpt["include"] = true;
+                root["usage"] = usageOpt;
+            }
 
             string body = root.ToString(Formatting.None);
+            if (Google.Active) body = Google.Body(body, jsonOnly);
             if (Plugin.CfgLogPayloads.Value)
                 Plugin.Log.LogInfo("--> " + url + "\n" + Trim(body, 4000));
 
@@ -3195,10 +3214,7 @@ namespace AI2UCustomAI
                 UnityWebRequest req = new UnityWebRequest(url, "POST");
                 req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
                 req.downloadHandler = new DownloadHandlerBuffer();
-                req.SetRequestHeader("Content-Type", "application/json");
-                req.SetRequestHeader("Authorization", "Bearer " + Plugin.CfgApiKey.Value);
-                req.SetRequestHeader("HTTP-Referer", "https://github.com/ai2u-custom-ai");
-                req.SetRequestHeader("X-Title", "AI2U Custom AI");
+                Auth(req);
 
                 yield return req.SendWebRequest();
 
@@ -3215,6 +3231,8 @@ namespace AI2UCustomAI
 
                 if (Plugin.CfgLogPayloads.Value)
                     Plugin.Log.LogInfo("<-- " + Trim(raw, 4000));
+
+                if (Google.Active) raw = Google.Normalize(raw, Plugin.CfgModel.Value);
 
                 string content = null;
                 try
@@ -3301,7 +3319,7 @@ namespace AI2UCustomAI
                 JArray localMessages = new JArray();
 
                 // 1. Single concise system prompt (~120 tokens)
-                string compactPrompt = BuildCompactLocalPrompt(summon);
+                string compactPrompt = Prompts.Apply("local_compact", BuildCompactLocalPrompt(summon));
                 JObject sysObj = new JObject();
                 sysObj["role"] = "system";
                 sysObj["content"] = compactPrompt;
@@ -3323,7 +3341,7 @@ namespace AI2UCustomAI
                 }
 
                 // 3. OOC override if player used [OOC]
-                string localOoc = Ooc.Block();
+                string localOoc = Prompts.Apply("local_ooc", Ooc.Block());
                 if (localOoc != null)
                 {
                     JObject oo = new JObject();
@@ -3401,7 +3419,7 @@ namespace AI2UCustomAI
             // purpose: it is the level prompt's replacement, so everything after
             // it - the engine whitelist, the names, the danger state - reads as a
             // correction to it rather than the other way round.
-            string lore = summon ? null : Lore.Block();
+            string lore = Prompts.Apply("lore", summon ? null : Lore.Block());
             if (lore != null)
             {
                 JObject lo = new JObject();
@@ -3419,7 +3437,7 @@ namespace AI2UCustomAI
             // to be the real one under [OOC] - honestly, since nothing in their
             // prompts said otherwise. Null everywhere but the Blue-line final
             // doors scene.
-            string doors = summon ? null : FinalDoors.Block();
+            string doors = Prompts.Apply("doors", summon ? null : FinalDoors.Block());
             if (doors != null)
             {
                 JObject dr = new JObject();
@@ -3432,7 +3450,7 @@ namespace AI2UCustomAI
             // as part of WHO SHE IS rather than as a rule imposed from outside.
             // Null on Normal - the request is then byte-identical to the slider
             // not existing, which is what "Normal is the base game" means.
-            string diff = summon ? null : Difficulty.Block();
+            string diff = Prompts.Apply("difficulty", summon ? null : Difficulty.Block());
             if (diff != null)
             {
                 JObject df = new JObject();
@@ -3445,7 +3463,7 @@ namespace AI2UCustomAI
             // same subject continued: the lore block hands her the answers, this
             // hands her the machinery those answers go into. Nothing here varies
             // per playthrough except the bookshelf order, which it reads live.
-            string mech = summon ? null : Mechanics.Block();
+            string mech = Prompts.Apply("mechanics", summon ? null : Mechanics.Block());
             if (mech != null)
             {
                 JObject mo = new JObject();
@@ -3458,7 +3476,7 @@ namespace AI2UCustomAI
             // to count. Placed after the mechanics block because it is about her
             // rather than about the house, and the schema block below still gets
             // the last word on which field names are legal.
-            string feel = summon ? null : Feelings.Block();
+            string feel = Prompts.Apply("feelings", summon ? null : Feelings.Block());
             if (feel != null)
             {
                 JObject fo = new JObject();
@@ -3471,7 +3489,7 @@ namespace AI2UCustomAI
             // system message after the level prompt so it wins any conflict:
             // the level prompt describes the world, but only these values
             // survive contact with the engine.
-            string contract = GameVocab.Contract();
+            string contract = Prompts.Apply("contract", GameVocab.Contract());
             if (contract != null)
             {
                 JObject engine = new JObject();
@@ -3484,7 +3502,7 @@ namespace AI2UCustomAI
             // carry them is substituted server-side, so without this she has no
             // idea what she is called and picks something new each session.
             // A summon gets the opposite of this: told whose name NOT to answer to.
-            string identity = summon ? Identity.SummonBlock() : Identity.Block();
+            string identity = Prompts.Apply("identity", summon ? Identity.SummonBlock() : Identity.Block());
             if (identity != null)
             {
                 JObject who = new JObject();
@@ -3498,7 +3516,7 @@ namespace AI2UCustomAI
             // only documented in the server-side level prompt we replace, so
             // without this block the model never learns it exists and every
             // "here you go" hands over nothing.
-            string gifts = summon ? null : Items.Block();
+            string gifts = Prompts.Apply("items", summon ? null : Items.Block());
             if (gifts != null)
             {
                 JObject gi = new JObject();
@@ -3512,7 +3530,7 @@ namespace AI2UCustomAI
             // running. Without this she argues politely while the engine has her
             // charging with a knife, because the engine replaces npc_action and
             // never touches the line she wrote.
-            string danger = summon ? null : Murder.Block();
+            string danger = Prompts.Apply("murder", summon ? null : Murder.Block());
             if (danger != null)
             {
                 JObject dg = new JObject();
@@ -3626,6 +3644,7 @@ namespace AI2UCustomAI
                 }
             }
 
+            reminder["content"] = Prompts.Apply("reminder", (string)reminder["content"]);
             messages.Add(reminder);
 
             // The roleplay conventions, before OOC so a tagged debug turn still
@@ -3637,7 +3656,7 @@ namespace AI2UCustomAI
             // must not have.
             if (!summon)
             {
-                string acts = Roleplay.ActionsBlock();
+                string acts = Prompts.Apply("roleplay_actions", Roleplay.ActionsBlock());
                 if (acts != null)
                 {
                     JObject ra = new JObject();
@@ -3646,7 +3665,7 @@ namespace AI2UCustomAI
                     messages.Add(ra);
                 }
 
-                string skip = Roleplay.TimeskipBlock();
+                string skip = Prompts.Apply("roleplay_timeskip", Roleplay.TimeskipBlock());
                 if (skip != null)
                 {
                     JObject rt = new JObject();
@@ -3662,7 +3681,7 @@ namespace AI2UCustomAI
             // every turn the gate does not pass - including always, while the mode
             // is off - so an ordinary request is unchanged byte for byte.
 #if CANALPA
-            string canalpa = Canalpa.Block();
+            string canalpa = Prompts.Apply("canalpa", Canalpa.Block());
             if (canalpa != null)
             {
                 JObject co = new JObject();
@@ -3684,7 +3703,7 @@ namespace AI2UCustomAI
             // says "for this one message, drop all of that" has to be the final
             // word - which also matches its own rule 3b, added for the same
             // incident.
-            string ooc = Ooc.Block();
+            string ooc = Prompts.Apply("ooc", Ooc.Block());
             if (ooc != null)
             {
                 JObject oo = new JObject();
@@ -3727,7 +3746,10 @@ namespace AI2UCustomAI
             root["temperature"] = Plugin.CfgTemperature.Value;
             root["max_tokens"] = replyRoom > 0 ? replyRoom : Plugin.CfgMaxTokens.Value;
 
-            if (Plugin.CfgHideReasoning.Value)
+            // OpenRouter only - see IsOpenRouterEndpoint. Everywhere else the
+            // reasoning models either hide their thinking already or expose a
+            // differently-named control, and an unknown field is a 400.
+            if (Plugin.CfgHideReasoning.Value && IsOpenRouterEndpoint())
             {
                 JObject reasoning = new JObject();
                 reasoning["exclude"] = true;
@@ -3743,6 +3765,20 @@ namespace AI2UCustomAI
             ApplyOpenRouterParams(root);
 
             return root.ToString(Formatting.None);
+        }
+
+        // `reasoning` and `usage` are OpenRouter's OWN request fields. They are
+        // not part of the OpenAI schema every other provider implements, and
+        // sending them is not harmless: xAI's documented request body accepts
+        // reasoning_effort (a string) and has no reasoning or usage object at
+        // all, so a Grok request carrying them is rejected outright. That is
+        // why "Grok text generation does not work" - the mod was sending
+        // OpenRouter dialect to an endpoint that never spoke it.
+        internal static bool IsOpenRouterEndpoint()
+        {
+            string b = Plugin.CfgBaseUrl != null ? Plugin.CfgBaseUrl.Value : "";
+            return !string.IsNullOrEmpty(b)
+                && b.IndexOf("openrouter", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         internal static void ApplyOpenRouterParams(JObject root)
@@ -3861,10 +3897,38 @@ namespace AI2UCustomAI
             return null;
         }
 
+        // One place decides how a request authenticates. The two call sites
+        // carried identical four-line header blocks, and a provider wired into
+        // only one of them fails in a way that reads as "dialogue works but her
+        // memory does not" rather than as an auth problem.
+        static void Auth(UnityWebRequest req)
+        {
+            if (Google.Active)
+            {
+                // Bearer must be ABSENT here, not merely unnecessary: Google
+                // authenticates on its own header and rejects a request that
+                // carries both.
+                Google.SetHeaders(req, Plugin.CfgApiKey.Value);
+                return;
+            }
+            req.SetRequestHeader("Content-Type", "application/json");
+            req.SetRequestHeader("Authorization", "Bearer " + Plugin.CfgApiKey.Value);
+            req.SetRequestHeader("HTTP-Referer", "https://github.com/ai2u-custom-ai");
+            req.SetRequestHeader("X-Title", "AI2U Custom AI");
+        }
+
         static string CombineUrl(string base_, string path)
         {
             // Share the Test button's logic so a URL that only works in one of
             // the common forms behaves the same in play as it does under test.
+            // Google's URL embeds the model AND the method in its path
+            // (.../models/<id>:generateContent), so it cannot be produced by
+            // appending a suffix the way every other provider here is. Handled
+            // before the candidate list, which only knows how to build
+            // /chat/completions forms.
+            if (Google.IsGoogle(base_))
+                return Google.Url(base_, Plugin.CfgModel.Value, false);
+
             List<string> c = ModUiPatch.ChatUrlCandidates(base_);
             return c.Count > 0 ? c[0] : "https://openrouter.ai/api/v1/chat/completions";
         }

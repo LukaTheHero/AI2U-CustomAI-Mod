@@ -91,7 +91,6 @@ namespace AI2UCustomAI
 
             try
             {
-                string dir = Path.GetDirectoryName(UnityEngine.Application.dataPath);
                 string data = UnityEngine.Application.dataPath;
                 string[] files = Directory.GetFiles(data, "level*");
 

@@ -58,7 +58,7 @@ namespace AI2UCustomAI
         static int _tab;
         static readonly string[] TabNames =
         {
-            "Setup", "Voice", "Model", "She knows", "Extra content", "Dev cheats"
+            "Setup", "Voice", "Model", "She knows", "Extra content", "Dev cheats", "Prompts"
         };
 
         // Panel-side snapshots of anything whose read walks the scene or scans
@@ -177,8 +177,22 @@ namespace AI2UCustomAI
                     if (clean.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
                         clean = clean.Substring(0, clean.Length - "/chat/completions".Length);
 
+                    // Google publishes its catalogue at exactly one path and
+                    // authenticates on its own header, so probing the OpenAI
+                    // candidates against it only produces 404s and a misleading
+                    // "no models found".
+                    bool isGoogle = Google.IsGoogle(clean);
+
                     List<string> candidates = new List<string>();
-                    if (clean.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) || clean.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
+                    if (isGoogle)
+                    {
+                        string gb = clean;
+                        if (!gb.EndsWith("/v1beta", StringComparison.OrdinalIgnoreCase) &&
+                            !gb.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+                            gb += "/v1beta";
+                        candidates.Add(gb + "/models?pageSize=200");
+                    }
+                    else if (clean.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) || clean.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
                     {
                         candidates.Add(clean + "/models");
                     }
@@ -198,9 +212,12 @@ namespace AI2UCustomAI
                             req.Method = "GET";
                             req.Timeout = 8000;
                             req.ReadWriteTimeout = 8000;
-                            req.UserAgent = "AI2U-CustomAI/5.4";
+                            req.UserAgent = "AI2U-CustomAI/" + Plugin.VERSION;
                             if (!string.IsNullOrEmpty(apiKey))
-                                req.Headers["Authorization"] = "Bearer " + apiKey.Trim();
+                            {
+                                if (isGoogle) req.Headers["x-goog-api-key"] = apiKey.Trim();
+                                else req.Headers["Authorization"] = "Bearer " + apiKey.Trim();
+                            }
                             req.Headers["HTTP-Referer"] = "https://github.com/ai2u-custom-ai";
                             req.Headers["X-Title"] = "AI2U Custom AI";
 
@@ -232,8 +249,37 @@ namespace AI2UCustomAI
                                             foreach (JToken item in modelsArr)
                                             {
                                                 string id = item["name"] != null ? item["name"].ToString() : (item["model"] != null ? item["model"].ToString() : null);
-                                                if (!string.IsNullOrEmpty(id) && !found.Contains(id))
-                                                    found.Add(id);
+                                                if (string.IsNullOrEmpty(id)) continue;
+
+                                                // Google names every entry
+                                                // "models/<id>"; left on, the id
+                                                // would build a URL with
+                                                // /models/models/<id> and 404.
+                                                if (id.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
+                                                    id = id.Substring(7);
+
+                                                // Where the catalogue says what
+                                                // a model can do, believe it.
+                                                JArray methods = item["supportedGenerationMethods"] as JArray;
+                                                if (methods != null)
+                                                {
+                                                    bool chats = false;
+                                                    foreach (JToken mm in methods)
+                                                        if (string.Equals(mm.ToString(), "generateContent", StringComparison.OrdinalIgnoreCase))
+                                                        { chats = true; break; }
+                                                    if (!chats) continue;
+                                                }
+
+                                                // generateContent is also how
+                                                // Google serves image, music,
+                                                // speech and robotics models.
+                                                // They answer, but never with
+                                                // dialogue, and offering them
+                                                // here only produces bug
+                                                // reports.
+                                                if (isGoogle && !Google.IsDialogueModel(id)) continue;
+
+                                                if (!found.Contains(id)) found.Add(id);
                                             }
                                         }
                                     }
@@ -308,6 +354,20 @@ namespace AI2UCustomAI
         public static void FetchProvidersAsync()
         {
             if (_fetchingProviders) return;
+
+            // Hard stop, not a UI guard. Everything below posts CfgApiKey to
+            // openrouter.ai as a Bearer token. Reached with a Google endpoint
+            // configured - or any other - it would hand that provider's key to
+            // an unrelated company. The button is already disabled off
+            // OpenRouter, but a disabled button is a suggestion, not a
+            // boundary, and profile switching can change the endpoint while
+            // this panel is open.
+            if (!IsOpenRouterBaseUrl())
+            {
+                _fetchProviderError = "Provider routing is an OpenRouter feature.";
+                return;
+            }
+
             _fetchingProviders = true;
             _fetchProviderError = null;
 
@@ -350,7 +410,7 @@ namespace AI2UCustomAI
                     req.Method = "GET";
                     req.Timeout = 8000;
                     req.ReadWriteTimeout = 8000;
-                    req.UserAgent = "AI2U-CustomAI/5.4";
+                    req.UserAgent = "AI2U-CustomAI/" + Plugin.VERSION;
                     if (!string.IsNullOrEmpty(apiKey))
                         req.Headers["Authorization"] = "Bearer " + apiKey.Trim();
                     req.Headers["HTTP-Referer"] = "https://github.com/ai2u-custom-ai";
@@ -851,9 +911,26 @@ namespace AI2UCustomAI
                 {
                     SetBaseUrlQuick("https://api.openai.com/v1");
                 }
+                // Native Google AI Studio. Three separate Nexus reports said the
+                // only way they could reach Gemini was to pay OpenRouter to
+                // relay it, so this endpoint gets a button of its own rather
+                // than a line in the documentation nobody reads.
+                if (GUILayout.Button("Google AI Studio", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick(Google.DEFAULT_BASE);
+                }
                 if (GUILayout.Button("DeepSeek", easyBtnStyle, GUILayout.Height(22f)))
                 {
                     SetBaseUrlQuick("https://api.deepseek.com/v1");
+                }
+                // xAI direct. The mod has shipped Grok TTS since 4.x, which made
+                // people reasonably assume Grok text worked too - it did not,
+                // and the reason was the OpenRouter-only fields now gated in
+                // Bridge, not the URL. The button removes the other half of the
+                // guesswork.
+                if (GUILayout.Button("xAI (Grok)", easyBtnStyle, GUILayout.Height(22f)))
+                {
+                    SetBaseUrlQuick("https://api.x.ai/v1");
                 }
                 if (GUILayout.Button("Groq", easyBtnStyle, GUILayout.Height(22f)))
                 {
@@ -1324,6 +1401,13 @@ namespace AI2UCustomAI
             // Its own tab rather than a corner of another one, because it is the
             // only thing in the panel that writes to save state. Ships in every
             // build, off by default, behind its own arming toggle.
+            if (_tab == 6)
+            {
+                // The whole tab lives in Prompts.cs. Nothing of the editor
+                // leaks into this file beyond this call.
+                Prompts.Draw();
+            }
+
             if (_tab == 5)
             {
                 CheatsHeader();
@@ -1593,6 +1677,9 @@ namespace AI2UCustomAI
                     + "supply and a custom endpoint otherwise loses, so it is on by default.");
             else if (_tab == 5)
                 TabIntro("Developer tools. These write to your save.");
+            else if (_tab == 6)
+                TabIntro("Every instruction the mod sends with your messages, shown exactly as it "
+                    + "was sent - and yours to rewrite.");
         }
 
         // One line under a tab's title saying what the tab is for. Cheap, and it

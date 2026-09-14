@@ -49,6 +49,18 @@ Bug reports and "it broke on version X" posts are genuinely welcome.[/color][/si
 
 [line]
 
+[size=5][color=#D291BC]■ New in 5.5 — Google AI Studio, Grok text, and every prompt is yours[/color][/size]
+
+[size=4][color=#FFCC55][b]First, an apology.[/b] Both 5.4.0 downloads contained the 5.3.0 build, so nobody who installed 5.4 ever received a single 5.4 feature. Three of you caught it before I did. 5.5.0 delivers everything 5.4 promised as well as everything below, and packaging is now a script that reads the version out of the finished zip and refuses to publish a mismatch — run against the broken 5.4 files, it rejects them both.[/color][/size]
+
+[list]
+[*][b]Google AI Studio works natively.[/b] Several people could only reach Gemini by paying OpenRouter to relay it. That was never a licensing problem — Google does not speak [font=Courier New]/chat/completions[/font], so the mod's only request shape could never reach it. The mod now speaks Gemini's own schema: press [b]Google AI Studio[/b] on the Setup tab, paste your key, press Fetch Models, play. Two things found by probing the live API explain why Gemini "does not work" for people: thinking tokens are spent out of your reply budget (a 300-token budget produced 288 tokens of thinking, 8 of answer, and a reply cut off mid-word), and the switch that turns thinking off is silently ignored on some models and rejected outright by Pro models. So the mod does not rely on it — every Google request is sent with room to think on top of your token setting. Safety filters are switched off explicitly, because a filtered turn in this game does not arrive as an error you can retry, it arrives as silence.
+[*][b]Grok text generation is fixed.[/b] The mod has shipped Grok TTS since 4.x, so it was fair to assume Grok could write her lines too. It could not — and the fault was here, not at xAI. Two fields in every request ([font=Courier New]reasoning[/font] and [font=Courier New]usage[/font]) are OpenRouter extensions that xAI's request body does not have, so it rejected the whole call. Both are now sent only to OpenRouter, and there is an [b]xAI (Grok)[/b] preset button. The same fix removes the hazard for every strict endpoint — DeepSeek, Groq and self-hosted servers were all being sent dialect they never agreed to speak.
+[*][b]A new Prompts tab: read and rewrite everything she is told.[/b] This mod writes a great deal on your behalf — who she is, what she remembers, what the engine accepts back, when she is allowed to hurt you — and until now you could change the model, the temperature and her voice, but not one word of what she is actually told. The new tab lists all sixteen injected blocks in the order the model reads them. Select one to see exactly what was sent last turn, edit it, press Save. Each block has its own revert, and [b]Restore ALL default prompts[/b] asks you to confirm before putting everything back. Wanted a character bio longer than the game's 100-character box? Edit [i]"Her persona, memories and secrets"[/i] directly and write as much as you like.
+[/list]
+
+[line]
+
 [size=5][color=#D291BC]■ New in 5.4 — Profiles, Resizable UI, Easy URLs & OpenRouter Provider Selection[/color][/size]
 
 [size=4][color=#9B7EBD]A massive quality-of-life update bringing configuration profiles, seamless provider selection, window resizing, and fast presets.[/color][/size]
@@ -406,7 +418,7 @@ Models I have run successfully:
 
 [list]
 [*][b][color=#E8A5C8]Offline Local Engine (Overtone)[/color][/b] — [color=#7ACC7A][b]100% offline, 0 keys, free[/b][/color] — basic on-device speech synthesizer (Amy, Cori, HFC Female). Functional, but robotic.
-[*][b][color=#E8A5C8]Microsoft Azure Speech[/color][/b] — [font=Courier New]https://<region>.tts.speech.microsoft.com/cognitiveservices/v1[/font] — voice like [font=Courier New]en-US-AvaMultilingualNeural[/font] — [color=#7ACC7A][b]RECOMMENDED, free tier available (500k chars/mo), crystal-clear & fast[/b][/color]
+[*][b][color=#E8A5C8]Microsoft Azure Speech — the game's ORIGINAL voice cast[/color][/b] — [color=#FFCC55][b]this one is NOT a Custom Endpoint URL.[/b][/color] It is its own mode: open [b]F9 → Voice[/b] and pick [font=Courier New]○ 2. Cloud Original (Azure)[/font], then enter your Azure [b]key[/b] and [b]region[/b]. Do not paste an Azure URL into the Custom Endpoint box — that box only speaks xAI, ElevenLabs and OpenAI shapes, so an Azure URL there fails quietly and drops you back to the offline voice. [color=#7ACC7A][b]RECOMMENDED, free tier available (500k chars/mo), and it is the real cast the game shipped with[/b][/color]
 [*][b][color=#E8A5C8]xAI (Grok)[/color][/b] — [font=Courier New]https://api.x.ai/v1[/font] — voice [font=Courier New]iris[/font], 26 built-in voices — [color=#7ACC7A][b]TESTED, expressive & affordable[/b][/color]
 [*][b][color=#E8A5C8]ElevenLabs[/color][/b] — [font=Courier New]https://api.elevenlabs.io/v1[/font] — a voice ID from your Voices page — [color=#7ACC7A][b]TESTED, best quality & emotion, costs more[/b][/color]
 [*][b][color=#E8A5C8]OpenAI-compatible[/color][/b] — [font=Courier New]https://api.openai.com/v1[/font] — that provider's voice name — [color=#CCAA55][b]implemented[/b][/color]
@@ -576,7 +588,7 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [list]
 [*]This routes dialogue away from the developers' metered servers, so treat it as a [b]personal-use tool[/b].
 [*][color=#E8A5C8][b]Keep your API keys private.[/b][/color] They are billable, and anyone holding the file can spend your credit. Never share your filled-in config.
-[*]Source is available — 26 C# files, buildable with the .NET Framework compiler that already ships with Windows. No Visual Studio needed.
+[*]Source is available — 30 C# files, buildable with the .NET Framework compiler that already ships with Windows. No Visual Studio needed.
 [*][color=#7ACC7A][b]This release is the same binary I run myself[/b][/color], for both stores, with nothing compiled out of it. The only bytes that differ from my own build are the compile timestamp.
 [*]Unofficial and unaffiliated with AlterStaff.
 [/list]
@@ -586,6 +598,41 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [size=5][color=#D291BC]■ Changelog[/color][/size]
 
 [color=#9B7EBD]All releases in full, collapsed. Each entry says what was visibly wrong, what was actually happening underneath, and what changed — the middle one is the part worth reading, because the obvious explanation was wrong more often than not.[/color]
+
+[spoiler][size=4][color=#7ACC7A]▼ 5.5.0 — "Google AI Studio, Grok text, and the Prompts tab"[/color][/size]
+
+[size=3][color=#E8A5C8][b]FIXED · The 5.4.0 download was the 5.3.0 build[/b] [font=Courier New]plugin/package.sh[/font][/color][/size]
+[list]
+[*][b]Visibly:[/b] no Fetch Models button, no resizable window, no profiles — and a DLL that reported 5.3.0 to anyone who checked.
+[*][b]Actually:[/b] the build compiles to one filename and installs THAT into the game, so the developer's own copy was genuinely correct. The zips were packed by hand from a release folder the build never writes to, which had not changed since 5.3. Every step succeeded and the release was still wrong.
+[*][b]Now:[/b] packaging is a script. The release folder is written BY the build, and the last thing it does is open the finished zips, read the version string out of the bytes a player downloads, and refuse to produce a release if they disagree. Run against the real 5.4 artifacts, it fails them both.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Google AI Studio, spoken natively[/b] [font=Courier New]plugin/Google.cs[/font][/color][/size]
+[list]
+[*]Gemini's own schema, translated in and out, so nothing else in the mod learns Google exists — the reply parser, the repair pass and the token accounting are untouched.
+[*]Thinking tokens are spent out of your reply budget, and the switch that disables them cannot be trusted (silently ignored on some models unless JSON mode is on; rejected outright by Pro models, which "only work in thinking mode"). Every Google request therefore carries room to think on top of your token setting — verified across the model range.
+[*]All five safety categories are set to OFF. This is a horror game whose third act is a character deciding whether to kill you, and a filtered turn arrives as silence rather than as a retryable error.
+[*]Fetch Models reads Google's live catalogue, strips its [font=Courier New]models/[/font] prefix, and hides the image, music, speech and robotics models that support the same API call but cannot hold a conversation.
+[*]Errors say what to do: a bad key, an exhausted quota and a retired model each get their own message, and Google's own text (which names the replacement model) is kept.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Grok text generation never worked[/b][/color][/size]
+[list]
+[*][font=Courier New]reasoning[/font] and [font=Courier New]usage[/font] are OpenRouter's own request fields, not part of the OpenAI schema. xAI's documented request body has neither, so every Grok text request was rejected. Both are now gated to OpenRouter, which also unbreaks DeepSeek, Groq and self-hosted endpoints. An [b]xAI (Grok)[/b] preset button was added.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · The Prompts tab[/b] [font=Courier New]plugin/Prompts.cs[/font][/color][/size]
+[list]
+[*]All sixteen injected blocks, listed in the order the model reads them, showing the exact text sent on your last turn. Edit, save, revert per block, or restore every default behind a confirmation.
+[*]An edit replaces a block; it cannot create one. A block that is not part of the current scene stays out of the request no matter what you save for it — otherwise editing the four-doors text would inject four-doors rules into a kitchen conversation.
+[*]Edits live in [font=Courier New]BepInEx/config/AI2UCustomAI_prompts.json[/font] and survive updates. The log states plainly when any block is player-edited.
+[/list]
+
+[size=3][color=#E8A5C8][b]DOCS · Azure Speech was described as something it is not[/b][/color][/size]
+[list]
+[*]This page listed Azure among the Custom Endpoint providers with a URL to paste. It is not one — it is its own voice mode ([font=Courier New]○ 2. Cloud Original (Azure)[/font] in F9 → Voice) taking a key and a region. Anyone following the old instructions pasted the URL into a box that only speaks xAI, ElevenLabs and OpenAI shapes, and got a silent fallback to the offline voice. The entry now says so.
+[/list][/spoiler]
 
 [spoiler][size=4][color=#7ACC7A]▼ 5.4.0 — "profiles, resizable UI, easy URLs & OpenRouter provider routing"[/color][/size]
 

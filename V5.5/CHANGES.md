@@ -1,5 +1,103 @@
 # AI2U — Custom AI Endpoint
 
+## 5.5.0 — Google AI Studio, Grok text, and every prompt is now yours
+
+Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64
+
+### FIRST · The 5.4.0 download was the 5.3.0 build. Sorry.
+
+Three people caught this before I did, one of them by hashing the file. Both
+5.4.0 zips on Nexus contained the 5.3.0 DLL, so nobody who installed 5.4 ever
+got a single 5.4 feature — no Fetch Models button, no resizable window, no
+profiles. The mod was built correctly and installed correctly on my own machine;
+the zips were packed by hand from a folder the build never wrote to, so every
+step reported success and the release was still wrong.
+
+Installing 5.5.0 gives you everything 5.4 promised as well as everything below.
+
+It cannot happen again by remembering harder, so it is now structural: packaging
+is a script, the release folder is written BY the build instead of beside it,
+and the last thing it does is open the finished zips, read the version string out
+of the bytes a player would actually download, and refuse to produce a release if
+they disagree. Run against the real broken 5.4 artifacts, that check fails them
+both — which is the only reason to trust it.
+
+### NEW · Google AI Studio, spoken natively
+
+Several people reported owning a Google AI Studio subscription and being able to
+reach Gemini only by paying OpenRouter to relay it. That was never a licensing
+problem — it was a wire format problem. Google does not speak
+`/chat/completions`, so the mod's one request shape could never reach it, and a
+pasted Google URL failed with a 404 that explained nothing.
+
+The mod now speaks Gemini's own schema. Press **Google AI Studio** on the Setup
+tab, paste your key, press Fetch Models, and play. The model dropdown reads
+Google's live catalogue and hides the image, music, speech and robotics models
+that answer but cannot hold a conversation.
+
+Two things were found by probing the live API that the documentation does not
+mention, and both are why Gemini "does not work" for people:
+
+- **Thinking is spent out of your reply budget.** A 300-token budget on
+  gemini-3.8-flash produced 288 tokens of private thinking, 8 tokens of answer,
+  and a reply cut off mid-word at `{"npc_reply_to_player`. The model was not
+  refusing. It was thinking until there was no room left to speak.
+- **The switch that turns thinking off cannot be trusted.** It is silently
+  ignored on some models unless JSON mode is also on, and Pro models reject it
+  outright ("this model only works in thinking mode"). So the mod does not rely
+  on it: every Google request is sent with room to think on top of your token
+  setting, which was verified to hold across the whole model range.
+
+Safety filters are switched off explicitly, because this is a horror game whose
+third act is a character deciding whether to kill you, and a filtered turn does
+not arrive as an error you can retry — it arrives as silence.
+
+### FIXED · Grok text generation, which never worked
+
+The mod has shipped Grok TTS since 4.x, so it was reasonable to assume Grok
+could also write her lines. It could not, and the reason was in the mod rather
+than at xAI: two fields in every request — `reasoning` and `usage` — are
+OpenRouter's own extensions, not part of the OpenAI schema everyone else
+implements. xAI's documented request body has neither, so it rejected the
+request outright.
+
+Both are now sent only to OpenRouter. There is an **xAI (Grok)** preset button
+next to the others. This same fix removes a hazard for every strict endpoint —
+DeepSeek, Groq and self-hosted servers were all being sent dialect they never
+agreed to speak.
+
+### NEW · The Prompts tab — read and rewrite everything she is told
+
+Also asked for on Nexus, and a fair ask. This mod writes a great deal on your
+behalf: who she is, what she remembers, what the engine will accept back, how
+difficulty bends her, when she is allowed to hurt you. You could change the
+model, the temperature and her voice — but not one word of what she is actually
+told, which is the part that decides who she is.
+
+A new **Prompts** tab lists all sixteen blocks the mod injects, in the order the
+model reads them. Select one to see exactly what was sent on your last turn,
+edit it, press Save, and she reads your version from the next message on. Each
+block has its own revert, and a **Restore ALL default prompts** button asks you
+to confirm before putting everything back the way the mod ships it.
+
+Two things worth knowing, both deliberate:
+
+- An edit replaces a block; it cannot create one. Blocks come and go by scene —
+  the four-doors block exists only in the final trial — and a block that is not
+  part of the current scene stays out of the request no matter what you save for
+  it.
+- What you see is the last text really sent, assembled live from your save. Most
+  blocks are empty until you have played a turn with the mod running. That is
+  honest: it shows what the model actually read, not a template of it.
+
+If you wanted a longer character bio than the game's 100-character box allows,
+this is the better door — edit "Her persona, memories and secrets" directly and
+write as much as you like.
+
+Your edits live in `BepInEx/config/AI2UCustomAI_prompts.json` and survive
+updates. If she ever starts behaving strangely, that tab is the first place to
+look, and the log says plainly when any block is player-edited.
+
 ## 5.4.0 — Profiles, Resizable UI, Easy URLs & OpenRouter Provider Routing
 
 Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64

@@ -193,7 +193,10 @@ namespace AI2UCustomAI
         // loudness (LUFS) analysis: one pass over the samples, no perceptual
         // model, and speech from a TTS engine is consistent enough that the
         // difference is not worth the cost here.
-        static void Level(AudioClip clip)
+        //
+        // Internal because GameTts runs its clips through the same pass, so
+        // switching providers never changes her loudness.
+        internal static void Level(AudioClip clip)
         {
             if (clip == null) return;
 

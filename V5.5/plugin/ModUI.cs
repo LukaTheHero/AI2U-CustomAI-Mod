@@ -570,6 +570,17 @@ namespace AI2UCustomAI
             if (string.IsNullOrEmpty(baseUrl)) baseUrl = "https://openrouter.ai/api/v1";
 
             string b = baseUrl.Trim().TrimEnd('/');
+
+            // Google has exactly one correct URL and it is templated on the
+            // model, so there is nothing to probe. Returning the OpenAI guesses
+            // here would make the Test button report "Bad URL" for a perfectly
+            // good Google endpoint.
+            if (Google.IsGoogle(b))
+            {
+                list.Add(Google.Url(b, Plugin.CfgModel != null ? Plugin.CfgModel.Value : null, false));
+                return list;
+            }
+
             if (b.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
             {
                 list.Add(b);
@@ -614,13 +625,25 @@ namespace AI2UCustomAI
                 root["max_tokens"] = 2000;
                 Plugin.ApplyOpenRouterParams(root);
 
+                // The Test button has to speak whatever the endpoint speaks, or
+                // it reports a failure the game will never actually hit.
+                bool testingGoogle = Google.Active;
+                string testBody = root.ToString(Newtonsoft.Json.Formatting.None);
+                if (testingGoogle) testBody = Google.Body(testBody, false);
+
                 UnityWebRequest req = new UnityWebRequest(url, "POST");
-                req.uploadHandler = new UploadHandlerRaw(
-                    Encoding.UTF8.GetBytes(root.ToString(Newtonsoft.Json.Formatting.None)));
+                req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(testBody));
                 req.downloadHandler = new DownloadHandlerBuffer();
-                req.SetRequestHeader("Content-Type", "application/json");
-                if (!string.IsNullOrEmpty(Plugin.CfgApiKey.Value))
-                    req.SetRequestHeader("Authorization", "Bearer " + Plugin.CfgApiKey.Value);
+                if (testingGoogle)
+                {
+                    Google.SetHeaders(req, Plugin.CfgApiKey.Value);
+                }
+                else
+                {
+                    req.SetRequestHeader("Content-Type", "application/json");
+                    if (!string.IsNullOrEmpty(Plugin.CfgApiKey.Value))
+                        req.SetRequestHeader("Authorization", "Bearer " + Plugin.CfgApiKey.Value);
+                }
                 req.timeout = 30;
 
                 yield return req.SendWebRequest();
@@ -633,6 +656,8 @@ namespace AI2UCustomAI
 
                 if (ok)
                 {
+                    if (testingGoogle) raw = Google.Normalize(raw, Plugin.CfgModel.Value);
+
                     string err = null;
                     try
                     {
@@ -646,7 +671,14 @@ namespace AI2UCustomAI
                     {
                         success = true;
 
-                        // Remember the form that actually worked.
+                        // Remember the form that actually worked - except on
+                        // Google, whose URL ends in ":generateContent" and
+                        // carries the model name. Writing that back would
+                        // replace the user's base URL with a full per-model
+                        // endpoint, which then breaks the moment they switch
+                        // model.
+                        if (testingGoogle) break;
+
                         string keep = url;
                         if (keep.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
                             keep = keep.Substring(0, keep.Length - "/chat/completions".Length);
@@ -691,6 +723,10 @@ namespace AI2UCustomAI
         {
             switch (code)
             {
+                // Google reports an invalid key as 400 INVALID_ARGUMENT rather
+                // than 401, so a bare "Failed 400" would send the user hunting
+                // for a URL problem they do not have.
+                case 400: return "Bad key or request";
                 case 401: return "Bad key";
                 case 402: return "No credit";
                 case 403: return "Forbidden";

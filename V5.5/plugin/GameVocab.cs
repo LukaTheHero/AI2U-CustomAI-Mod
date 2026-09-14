@@ -252,8 +252,6 @@ namespace AI2UCustomAI
             //
             // Now: no vocabulary means no vocabulary section, and everything else
             // is still emitted.
-            bool haveVocab = Discovered;
-
             StringBuilder sb = new StringBuilder();
             sb.Append("\n\n### ENGINE CONSTRAINTS (authoritative)\n");
             sb.Append("The values below are read directly from the running game. ");
@@ -262,67 +260,114 @@ namespace AI2UCustomAI
             sb.Append("Copy them exactly: lowercase, underscores, no paraphrasing, ");
             sb.Append("no inventing, no translating.\n");
 
-            if (haveVocab)
-            {
-                Line(sb, "npc_action", Actions);
-                Line(sb, "npc_target_location", Locations);
-                Line(sb, "npc_face_expression", Faces);
-            }
-
+            // These three are compile-time constants rather than scene reads, so
+            // they stay in the editable half - there is nothing about them that
+            // can go stale between scenes.
             Line(sb, "npc_body_animation", new List<string>(BodyAnimations));
             Line(sb, "angry_level", new List<string>(AngryLevels));
             Line(sb, "favorability_change", new List<string>(Favorability));
 
-            if (haveVocab)
-            {
-                sb.Append("\nMovement rules:\n");
-                sb.Append("- To follow the player, npc_action MUST be exactly ");
-                sb.Append("\"following_player\" (or \"following_player_closely\" to stay near).\n");
-                sb.Append("- To walk somewhere, set npc_action \"walking\" AND ");
-                sb.Append("npc_target_location to one of the locations listed above.\n");
-                sb.Append("- To approach the player, npc_target_location \"player_location\".\n");
-                sb.Append("- If no movement is wanted, use \"other\" and leave ");
-                sb.Append("npc_target_location as an empty string.\n");
-                sb.Append("- Never put a location name in npc_action, and never put ");
-                sb.Append("an action name in npc_target_location.\n");
 
-                // Every behaviour tree guards the call the same way -
-                // NPCController_CatGirl_BehaviorTree.cs:71 and the ten other
-                // controllers all read `if (npc_action != "")` before calling
-                // ShowAction, and npc_target_location is only ever applied
-                // INSIDE ShowAction. So a destination with an empty action is
-                // not a partial order, it is no order: she stays put and says
-                // she is on her way. The mirror image of the kiss bug, and the
-                // likelier one, because "I'll head to the kitchen" with no
-                // action set is a natural reply shape.
-                sb.Append("- A location on its own does NOTHING. npc_target_location is only read ");
-                sb.Append("when npc_action is non-empty, so naming a destination with an empty ");
-                sb.Append("action leaves her standing exactly where she is while she says she is ");
-                sb.Append("going. Always pair a destination with \"walking\".\n");
-
-                Affection(sb);
-            }
-
-            // Gates and ItemRules describe what the LEVEL'S MAIN CHARACTER owns and
+            // ItemRules describes what the LEVEL'S MAIN CHARACTER owns and
             // refuses to hand over - the potion recipe is hers, the necklace piece
             // is hers, the apartment key is hers. A magic circle summon is not her,
             // so emitting them there told a sacrificed toy's soul to guard the
             // witch's secrets. Everything else in the contract is engine schema and
-            // applies to any speaker, including the encounter fields this method's
-            // opening comment exists to protect.
+            // applies to any speaker. (Gates moved to LiveContract() in 5.5 and
+            // carries the same guard there; the encounter fields moved with it
+            // and remain unconditional.)
             bool summon = Identity.IsSummon();
 
-            if (!summon)
-            {
-                Gates(sb);
-            }
-            Encounters(sb);
             ReplyRules(sb);
             if (!summon)
             {
                 ItemRules(sb);
             }
             return sb.ToString();
+        }
+
+        // The half of the contract that changes with the level and the scene,
+        // kept OUT of Contract() so the prompt editor can never freeze it.
+        //
+        // Gates() is filtered by the current level and Encounters() by the live
+        // scene, and between them they are the only place in the mod that ever
+        // names allow_exit_door_open, should_disclose_magic_scroll,
+        // allow_escape_pod_access, allow_locked_room_access, is_soothed and
+        // npc_action_chain. Nothing parses them, nothing defaults them, nothing
+        // repairs them - the prompt text IS the implementation. A player who
+        // saved an edited contract on level 1 would therefore carry level 1's
+        // gates into level 3, where the escape pod then cannot be opened by any
+        // phrasing, and into the Dark Siren encounter, where the win condition
+        // simply would not exist. That is a softlock and then a death, caused
+        // by a text edit, with nothing in the log to connect the two.
+        //
+        // Returning null when empty keeps it honest for the summon case, which
+        // has no gates of its own.
+        // The half of the engine constraints that the LIVE SCENE supplies.
+        //
+        // Lifted out of Contract() verbatim, guard and order intact, so the
+        // prompt editor cannot pin it. Actions, Locations and Faces are read
+        // off the running NPCController by Refresh() and wiped by Clear() when
+        // the scene changes - Clear()'s own comment calls carrying one scene's
+        // lists into another "actively harmful". A frozen copy makes her name a
+        // location the room does not contain; the transform lookup returns
+        // null, and she stands still while saying she is on her way. The
+        // movement rules and Affection travel with the lists because they quote
+        // them and share their haveVocab guard.
+        static void Vocabulary(StringBuilder sb)
+        {
+            if (!Discovered) return;
+
+            Line(sb, "npc_action", Actions);
+            Line(sb, "npc_target_location", Locations);
+            Line(sb, "npc_face_expression", Faces);
+
+            sb.Append("\nMovement rules:\n");
+            sb.Append("- To follow the player, npc_action MUST be exactly ");
+            sb.Append("\"following_player\" (or \"following_player_closely\" to stay near).\n");
+            sb.Append("- To walk somewhere, set npc_action \"walking\" AND ");
+            sb.Append("npc_target_location to one of the locations listed above.\n");
+            sb.Append("- To approach the player, npc_target_location \"player_location\".\n");
+            sb.Append("- If no movement is wanted, use \"other\" and leave ");
+            sb.Append("npc_target_location as an empty string.\n");
+            sb.Append("- Never put a location name in npc_action, and never put ");
+            sb.Append("an action name in npc_target_location.\n");
+
+            // Every behaviour tree guards the call the same way -
+            // NPCController_CatGirl_BehaviorTree.cs:71 and the ten other
+            // controllers all read `if (npc_action != "")` before calling
+            // ShowAction, and npc_target_location is only ever applied
+            // INSIDE ShowAction. So a destination with an empty action is
+            // not a partial order, it is no order: she stays put and says
+            // she is on her way. The mirror image of the kiss bug, and the
+            // likelier one, because "I'll head to the kitchen" with no
+            // action set is a natural reply shape.
+            sb.Append("- A location on its own does NOTHING. npc_target_location is only read ");
+            sb.Append("when npc_action is non-empty, so naming a destination with an empty ");
+            sb.Append("action leaves her standing exactly where she is while she says she is ");
+            sb.Append("going. Always pair a destination with \"walking\".\n");
+
+            Affection(sb);
+        }
+
+        public static string LiveContract()
+        {
+            StringBuilder sb = new StringBuilder();
+            bool summon = Identity.IsSummon();
+
+            // The vocabulary and the movement rules that quote it. Read off the
+            // live scene by Refresh() and deliberately emptied by Clear() when
+            // the scene changes, so they are the same freeze hazard as the
+            // gates: a pinned list makes her name a location this room does not
+            // have, the transform lookup returns null, and she stands still.
+            Vocabulary(sb);
+
+            if (!summon)
+            {
+                Gates(sb);
+            }
+            Encounters(sb);
+            return sb.Length > 0 ? sb.ToString() : null;
         }
 
         // Kissing and hugging are the only two actions the engine can drop

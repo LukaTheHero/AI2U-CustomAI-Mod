@@ -58,7 +58,7 @@ namespace AI2UCustomAI
         static int _tab;
         static readonly string[] TabNames =
         {
-            "Setup", "Voice", "Model", "She knows", "Extra content", "Dev cheats", "Prompts"
+            "Setup", "Voice", "Model", "She knows", "Extra content", "Dev cheats", "⚠ Prompts ⚠"
         };
 
         // Panel-side snapshots of anything whose read walks the scene or scans
@@ -127,6 +127,13 @@ namespace AI2UCustomAI
         static bool _fetchingProviders = false;
         static string _fetchProviderError = null;
         static string _lastFetchedProviderModel = null;
+
+        // Lets a tab hand the player back to another one. The Prompts gate uses
+        // it for its way-out buttons, which have to work from inside Prompts.cs.
+        internal static void GoToTab(int tab)
+        {
+            if (tab >= 0 && tab < TabNames.Length) _tab = tab;
+        }
 
         static bool IsOpenRouterBaseUrl()
         {
@@ -816,6 +823,7 @@ namespace AI2UCustomAI
                 bool active = _tab == i;
                 bool extra = TabNames[i] == "Extra content";
                 bool cheats = TabNames[i] == "Dev cheats";
+                bool prompts = i == 6;
 
                 GUIStyle ts = new GUIStyle(GUI.skin.button);
                 ts.alignment = TextAnchor.MiddleLeft;
@@ -824,6 +832,7 @@ namespace AI2UCustomAI
                 ts.fontStyle = active ? FontStyle.Bold : FontStyle.Normal;
 
                 Color c = extra ? DangerRed
+                        : prompts ? PromptPink
                         : cheats ? CheatBlue
                         : active ? Color.white
                         : new Color(0.74f, 0.78f, 0.84f);
@@ -1677,7 +1686,7 @@ namespace AI2UCustomAI
                     + "supply and a custom endpoint otherwise loses, so it is on by default.");
             else if (_tab == 5)
                 TabIntro("Developer tools. These write to your save.");
-            else if (_tab == 6)
+            else if (_tab == 6 && Prompts.Unlocked)
                 TabIntro("Every instruction the mod sends with your messages, shown exactly as it "
                     + "was sent - and yours to rewrite.");
         }
@@ -2224,6 +2233,10 @@ namespace AI2UCustomAI
         // runs unless Cheats/Enabled is ticked, which is off by default and stays
         // off until someone goes looking for it.
         static readonly Color CheatBlue = new Color(0.45f, 0.75f, 1f, 1f);
+        // Prompts gets its own colour for the same reason Dev cheats does: it is
+        // not a settings tab, it is a tab that can quietly ruin a playthrough,
+        // and it should not look like its neighbours.
+        internal static readonly Color PromptPink = new Color(1f, 0.55f, 0.85f, 1f);
 
         static string _trustBuf = "";
         static string _msgBuf = "";

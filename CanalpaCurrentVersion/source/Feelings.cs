@@ -301,9 +301,11 @@ namespace AI2UCustomAI
                     + "mean it; it is a kindness, not a reflex.\n");
             }
 
-            string hard = HardBlock();
-            if (hard != null) sb.Append(hard);
-
+            // NOT appended here any more. The moment taxonomy belongs to
+            // CfgHardDifficulty, and folding it into this string made one
+            // prompt-editor key own two separately-toggled blocks - so a saved
+            // override pinned the toggle's output regardless of the toggle.
+            // It is now injected under its own key; see BuildRequest.
             return sb.ToString();
         }
         // The moment prompt. She names a CATEGORY, never a number - the score
@@ -313,7 +315,7 @@ namespace AI2UCustomAI
         // this an egg or an engagement?", which models actually answer well.
         // The anchors are calibration, not lore - they describe no fact about
         // her world, only what each tier means.
-        static string HardBlock()
+        internal static string HardBlock()
         {
             if (Plugin.CfgHardDifficulty == null || !Plugin.CfgHardDifficulty.Value) return null;
 

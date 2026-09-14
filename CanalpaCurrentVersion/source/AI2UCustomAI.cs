@@ -2960,10 +2960,15 @@ namespace AI2UCustomAI
             //
             // Deliberately UNCONDITIONAL. This used to sit behind
             // CfgClampValues, which quietly made a debug switch delete the whole
-            // engine contract: Refresh() is the only writer of Actions,
-            // Contract() early-returns on an empty Actions list, and Contract()
-            // is the sole carrier of the progression gates, the encounter fields
-            // and the reply-text rules. So "turn this off to see what the model
+            // engine contract: Refresh() is the only writer of Actions, and the
+            // contract was at the time the sole carrier of the progression
+            // gates, the encounter fields and the reply-text rules.
+            //
+            // (5.5 split that string in two. The gates, the encounter fields and
+            // the live vocabulary now come from GameVocab.LiveContract(), which
+            // the prompt editor deliberately cannot reach - for exactly the
+            // reason recorded below. Refresh() still feeds both halves, so this
+            // call is no less load-bearing than it was.) So "turn this off to see what the model
             // emits raw" also removed the Dark Siren win condition, every door
             // unlock, and the warning that a square bracket voids the reply and
             // starts a permanent hunt on the second offence - all silently.
@@ -3327,7 +3332,11 @@ namespace AI2UCustomAI
                 JArray localMessages = new JArray();
 
                 // 1. Single concise system prompt (~120 tokens)
-                string compactPrompt = Prompts.Apply("local_compact", BuildCompactLocalPrompt(summon));
+                // Scoped: this text names her and the player, and in Local Model
+                // Mode it is the ENTIRE system prompt, so an unscoped freeze is
+                // the worst instance of the cross-character leak, not the least.
+                string compactPrompt = Prompts.Apply("local_compact",
+                    BuildCompactLocalPrompt(summon), Prompts.CharScope());
                 JObject sysObj = new JObject();
                 sysObj["role"] = "system";
                 sysObj["content"] = compactPrompt;
@@ -3427,7 +3436,7 @@ namespace AI2UCustomAI
             // purpose: it is the level prompt's replacement, so everything after
             // it - the engine whitelist, the names, the danger state - reads as a
             // correction to it rather than the other way round.
-            string lore = Prompts.Apply("lore", summon ? null : Lore.Block());
+            string lore = Prompts.Apply("lore", summon ? null : Lore.Block(), Prompts.CharScope());
             if (lore != null)
             {
                 JObject lo = new JObject();
@@ -3458,7 +3467,7 @@ namespace AI2UCustomAI
             // as part of WHO SHE IS rather than as a rule imposed from outside.
             // Null on Normal - the request is then byte-identical to the slider
             // not existing, which is what "Normal is the base game" means.
-            string diff = Prompts.Apply("difficulty", summon ? null : Difficulty.Block());
+            string diff = Prompts.Apply("difficulty", summon ? null : Difficulty.Block(), Prompts.DifficultyScope());
             if (diff != null)
             {
                 JObject df = new JObject();
@@ -3471,7 +3480,7 @@ namespace AI2UCustomAI
             // same subject continued: the lore block hands her the answers, this
             // hands her the machinery those answers go into. Nothing here varies
             // per playthrough except the bookshelf order, which it reads live.
-            string mech = Prompts.Apply("mechanics", summon ? null : Mechanics.Block());
+            string mech = Prompts.Apply("mechanics", summon ? null : Mechanics.Block(), Prompts.LevelScope());
             if (mech != null)
             {
                 JObject mo = new JObject();
@@ -3485,6 +3494,21 @@ namespace AI2UCustomAI
             // rather than about the house, and the schema block below still gets
             // the last word on which field names are legal.
             string feel = Prompts.Apply("feelings", summon ? null : Feelings.Block());
+
+            // Its own key, because it belongs to CfgHardDifficulty rather than to
+            // the feelings block it used to be glued onto. Sharing a key meant a
+            // saved override pinned this text on regardless of the toggle - a
+            // switch that reads ON in the menu while doing nothing is the worst
+            // shape a setting can take.
+            // Only when the feelings block itself went out. Before the split,
+            // HardBlock was appended inside Feelings.Block(), so its early return
+            // when CfgSendFeelings is off suppressed both - and emitting the
+            // moments taxonomy on its own would be new behaviour, not a fix.
+            if (!summon && feel != null)
+            {
+                string moments = Prompts.Apply("feelings_moments", Feelings.HardBlock());
+                if (moments != null) feel = feel + moments;
+            }
             if (feel != null)
             {
                 JObject fo = new JObject();
@@ -3498,6 +3522,17 @@ namespace AI2UCustomAI
             // the level prompt describes the world, but only these values
             // survive contact with the engine.
             string contract = Prompts.Apply("contract", GameVocab.Contract());
+
+            // Appended AFTER any override, and never routed through the editor.
+            // These are the level's door unlocks and the scene's encounter
+            // fields, and they are the only implementation of those mechanics
+            // anywhere in the mod - a frozen level-1 contract carried into level
+            // 3 would remove the escape pod's unlock entirely and softlock the
+            // run, and remove the Dark Siren's win condition, which by that
+            // scene's own rules then kills the player on the second failure.
+            string liveContract = GameVocab.LiveContract();
+            if (liveContract != null)
+                contract = (contract ?? "") + liveContract;
             if (contract != null)
             {
                 JObject engine = new JObject();
@@ -3510,7 +3545,13 @@ namespace AI2UCustomAI
             // carry them is substituted server-side, so without this she has no
             // idea what she is called and picks something new each session.
             // A summon gets the opposite of this: told whose name NOT to answer to.
-            string identity = Prompts.Apply("identity", summon ? Identity.SummonBlock() : Identity.Block());
+            // Two keys, not one. A summon is a different character speaking through
+            // a different block, and sharing a key would let an edit written for
+            // her ordinary self replace the summon's identity as well - the
+            // override would look like it had leaked into the wrong scene.
+            string identity = summon
+                ? Prompts.Apply("identity_summon", Identity.SummonBlock(), Prompts.CharScope())
+                : Prompts.Apply("identity", Identity.Block(), Prompts.CharScope());
             if (identity != null)
             {
                 JObject who = new JObject();

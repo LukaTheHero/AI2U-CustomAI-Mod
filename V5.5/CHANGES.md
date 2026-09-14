@@ -74,11 +74,26 @@ difficulty bends her, when she is allowed to hurt you. You could change the
 model, the temperature and her voice — but not one word of what she is actually
 told, which is the part that decides who she is.
 
-A new **Prompts** tab lists all sixteen blocks the mod injects, in the order the
-model reads them. Select one to see exactly what was sent on your last turn,
-edit it, press Save, and she reads your version from the next message on. Each
-block has its own revert, and a **Restore ALL default prompts** button asks you
-to confirm before putting everything back the way the mod ships it.
+A new **Prompts** tab lists every block the mod injects, in the order the model
+reads them. Select one to see exactly what the next message would
+send, edit it, press Save, and she reads your version from then on. Each block
+has its own revert, and a **Restore ALL default prompts** button asks you to
+confirm before putting everything back the way the mod ships it.
+
+**It is locked behind a deliberately tedious door, and that is not decoration.**
+The tab prints the level's own secrets in plain words - who is really behind
+each of the four doors, how the endings are chosen, when she is allowed to hurt
+you - so opening it casually spoils the game it belongs to. And the damage runs
+the other way too: these blocks are load-bearing and the order between them is
+load-bearing, so rewriting them because one reply annoyed you is a good way to
+quietly dismantle the thing you were enjoying. So: a spoiler warning, then a
+second screen that says plainly that you probably do not want this and points
+you at Local Model Mode and the ordinary settings tabs instead, then a button
+you have to hold down for ten seconds. Let go and it starts again.
+
+You do this once, ever. After it unlocks, the tab stays open permanently,
+including across restarts - the unlock lives in the prompts file rather than in
+a config entry, so switching profiles cannot silently re-lock or unlock it.
 
 Two things worth knowing, both deliberate:
 
@@ -86,6 +101,21 @@ Two things worth knowing, both deliberate:
   the four-doors block exists only in the final trial — and a block that is not
   part of the current scene stays out of the request no matter what you save for
   it.
+- Editing prompts cannot reach past the model. Every rule the mod enforces in
+  code stays enforced: the consent ritual on Canalpa's one irreversible act, the
+  health floor that stops her chosen jolt from killing you, the clamps on trust
+  and affection, and the item check that refuses a gift the game does not have.
+  A rewritten block changes what she is told, not what the mod will allow.
+- The parts of the engine contract that change with your level and your scene —
+  the door unlocks, the escape pod, the Dark Siren's win condition — are appended
+  after your edit and cannot be edited away. They are the only implementation of
+  those mechanics anywhere in the mod, so a contract edited on level 1 and
+  carried into level 3 would have quietly softlocked the run.
+- Blocks that differ per character or per level are saved per character or per
+  level. Editing her persona while talking to one girl does not rewrite another
+  girl's persona, and the panel says which one you are editing.
+- Saving a block you did not actually change reverts it instead of freezing a
+  copy, so pressing Save out of curiosity cannot pin one scene's text forever.
 - What you see is the last text really sent, assembled live from your save. Most
   blocks are empty until you have played a turn with the mod running. That is
   honest: it shows what the model actually read, not a template of it.

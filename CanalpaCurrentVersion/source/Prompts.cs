@@ -116,6 +116,63 @@ namespace AI2UCustomAI
             return generated;
         }
 
+        // Fill the panel WITHOUT waiting for a conversation turn.
+        //
+        // Capturing only on send was technically honest and practically
+        // useless: open the tab before speaking to her and all sixteen blocks
+        // read "not sent yet", which looks exactly like a broken feature. These
+        // generators are the same ones BuildRequest calls and they are pure
+        // reads of the live save, so running them here produces precisely what
+        // the next turn would send.
+        //
+        // Every call is isolated. Outside a conversation some of these walk
+        // scene objects that do not exist yet, and one throwing generator must
+        // cost its own block and nothing else - certainly not the panel.
+        static float _previewAt = -99f;
+
+        internal static void CapturePreview(bool force)
+        {
+            if (!force && Time.realtimeSinceStartup - _previewAt < 5f) return;
+            _previewAt = Time.realtimeSinceStartup;
+
+            // The contract is assembled from a vocabulary the send path
+            // refreshes first; without this it reports the previous scene's.
+            Grab("contract", delegate { GameVocab.Refresh(); return GameVocab.Contract(); });
+
+            Grab("identity",  delegate { return Identity.Block(); });
+            Grab("lore",      delegate { return Lore.Block(); });
+            Grab("mechanics", delegate { return Mechanics.Block(); });
+            Grab("feelings",  delegate { return Feelings.Block(); });
+            Grab("difficulty",delegate { return Difficulty.Block(); });
+            Grab("items",     delegate { return Items.Block(); });
+            Grab("murder",    delegate { return Murder.Block(); });
+            Grab("doors",     delegate { return FinalDoors.Block(); });
+            Grab("roleplay_actions",  delegate { return Roleplay.ActionsBlock(); });
+            Grab("roleplay_timeskip", delegate { return Roleplay.TimeskipBlock(); });
+            Grab("ooc",       delegate { return Ooc.Block(); });
+            Grab("local_ooc", delegate { return Ooc.Block(); });
+            Grab("local_compact", delegate { return Bridge.CompactLocalPromptPreview(); });
+#if CANALPA
+            Grab("canalpa",   delegate { return Canalpa.Block(); });
+#endif
+        }
+
+        delegate string Gen();
+
+        static void Grab(string key, Gen f)
+        {
+            try
+            {
+                string v = f();
+                if (!string.IsNullOrEmpty(v)) _live[key] = v;
+            }
+            catch (Exception)
+            {
+                // Not loggable per-frame without spamming; a block that cannot
+                // be built right now simply stays as it was.
+            }
+        }
+
         internal static string Live(string key)
         {
             string v;
@@ -238,6 +295,10 @@ namespace AI2UCustomAI
         // internals exported to draw itself.
         internal static void Draw()
         {
+            // Cheap because it is throttled: the generators are the same ones a
+            // turn runs, and the panel is only drawn while the tab is open.
+            CapturePreview(false);
+
             GUIStyle head = new GUIStyle(GUI.skin.label);
             head.fontStyle = FontStyle.Bold;
             head.fontSize = 14;
@@ -247,9 +308,9 @@ namespace AI2UCustomAI
                 "The mod writes these blocks and sends them with every message. Pick one on the left to "
                 + "read exactly what was sent last turn, edit it, and press Save. An edited block replaces "
                 + "the mod's version until you restore it.\n"
-                + "Blocks are built live from your save, so most stay empty until you have played a turn "
-                + "with the mod running - and a block that is not part of the current scene stays out of "
-                + "the request no matter what you write in it.",
+                + "These are read live from your current save, so what you see is what the next message "
+                + "would send. A block that is not part of the scene you are in right now stays empty - "
+                + "and stays out of the request no matter what you write in it.",
                 GUI.skin.label);
 
             GUILayout.Space(6f);
@@ -257,8 +318,9 @@ namespace AI2UCustomAI
             GUILayout.BeginHorizontal();
 
             // ---- the list ----
-            GUILayout.BeginVertical(GUILayout.Width(260f));
-            _listScroll = GUILayout.BeginScrollView(_listScroll, GUILayout.Height(420f));
+            GUILayout.BeginVertical(GUILayout.Width(286f));
+            _listScroll = GUILayout.BeginScrollView(_listScroll, false, true,
+                GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(400f));
             for (int i = 0; i < Registry.Length; i++)
             {
                 Entry e = Registry[i];
@@ -269,9 +331,12 @@ namespace AI2UCustomAI
                 GUIStyle st = new GUIStyle(GUI.skin.button);
                 st.alignment = TextAnchor.MiddleLeft;
                 st.fontSize = 11;
+                st.wordWrap = false;
+                st.clipping = TextClipping.Clip;
+                st.padding = new RectOffset(6, 4, 2, 2);
                 if (i == _sel) st.fontStyle = FontStyle.Bold;
 
-                if (GUILayout.Button(mark + e.Title, st, GUILayout.Height(24f)))
+                if (GUILayout.Button(mark + e.Title, st, GUILayout.Height(24f), GUILayout.Width(252f)))
                 {
                     _sel = i;
                     _bufFor = -1;
@@ -280,7 +345,13 @@ namespace AI2UCustomAI
             }
             GUILayout.EndScrollView();
 
-            GUILayout.Label("✎ edited   ● seen this session   ○ not seen yet", GUI.skin.label);
+            GUILayout.Label("✎ edited   ● active now   ○ not in this scene", GUI.skin.label);
+            if (GUILayout.Button("↻ Refresh from game", GUILayout.Height(22f), GUILayout.Width(252f)))
+            {
+                CapturePreview(true);
+                _bufFor = -1;
+                Flash("Re-read every block from the save as it stands now.");
+            }
             GUILayout.EndVertical();
 
             GUILayout.Space(8f);
@@ -295,7 +366,8 @@ namespace AI2UCustomAI
             GUILayout.Label(sel.Note, GUI.skin.label);
 
             if (Live(sel.Key) == null && !IsOverridden(sel.Key))
-                GUILayout.Label("Not sent yet this session - play a turn with the mod running to capture it.",
+                GUILayout.Label("Empty right now - this block is not part of the current scene, or the game "
+                    + "has not loaded far enough to build it. Load a save and come back.",
                     GUI.skin.label);
 
             if (_bufFor != _sel)
@@ -304,8 +376,19 @@ namespace AI2UCustomAI
                 _bufFor = _sel;
             }
 
-            _textScroll = GUILayout.BeginScrollView(_textScroll, GUILayout.Height(360f));
-            _buf = GUILayout.TextArea(_buf ?? "", GUILayout.ExpandHeight(true));
+            GUIStyle area = new GUIStyle(GUI.skin.textArea);
+            area.wordWrap = true;
+            area.alignment = TextAnchor.UpperLeft;
+            area.fontSize = 12;
+            area.padding = new RectOffset(6, 6, 6, 6);
+
+            // Horizontal scrollbar suppressed outright (GUIStyle.none): the text
+            // wraps, so a horizontal bar can only ever appear by accident and it
+            // steals a row of height when it does.
+            _textScroll = GUILayout.BeginScrollView(_textScroll, false, true,
+                GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(400f));
+            _buf = GUILayout.TextArea(_buf ?? "", area,
+                GUILayout.ExpandWidth(true), GUILayout.MinHeight(384f));
             GUILayout.EndScrollView();
 
             GUILayout.BeginHorizontal();

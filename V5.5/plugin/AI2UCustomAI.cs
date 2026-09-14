@@ -3268,6 +3268,14 @@ namespace AI2UCustomAI
             if (done != null) done(null);
         }
 
+        // Preview hook for the Prompts tab. The builder itself is private and
+        // takes the send path's summon flag; the panel has no turn in hand, so
+        // it asks for the ordinary shape.
+        internal static string CompactLocalPromptPreview()
+        {
+            return BuildCompactLocalPrompt(false);
+        }
+
         static string BuildCompactLocalPrompt(bool summon)
         {
             StringBuilder sb = new StringBuilder();

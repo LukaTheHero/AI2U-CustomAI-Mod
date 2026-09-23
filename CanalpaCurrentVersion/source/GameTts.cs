@@ -58,6 +58,11 @@ namespace AI2UCustomAI
         public string PitchFormatted;
         public string RateFormatted;
         public float Pitch;
+        // Which character this is for (a Voices.Names entry, or null), and the
+        // voice the player typed for her, still unresolved - it can only be
+        // checked against the region's catalogue once the region is known.
+        public string Who;
+        public string Custom;
     }
 
     // Handles both Local Overtone (offline) and Cloud Original (Azure) speech engines.
@@ -238,80 +243,125 @@ namespace AI2UCustomAI
 
         public static AzureVoiceSpec GetAzureVoiceSpec(int? characterId)
         {
-            string overrideVoice = Voices.Resolve(characterId);
-            if (!string.IsNullOrEmpty(overrideVoice) && overrideVoice.IndexOf("Neural", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return new AzureVoiceSpec
-                {
-                    VoiceName = overrideVoice,
-                    Language = overrideVoice.Length >= 5 ? overrideVoice.Substring(0, 5) : "en-US",
-                    PitchFormatted = "+0%",
-                    RateFormatted = "+0%",
-                    Pitch = 1.0f
-                };
-            }
+            return GetAzureVoiceSpec(characterId, null);
+        }
+
+        // forceName voices a specific character (a Voices.Names entry) whoever is
+        // on screen - the Voice tab's per-character test buttons, where nobody is
+        // actually speaking. Otherwise the speaker is read from the game.
+        public static AzureVoiceSpec GetAzureVoiceSpec(int? characterId, string forceName)
+        {
+            string who = forceName ?? Voices.BaseNameForId(characterId);
+            bool summon = forceName != null
+                ? (forceName == "MagicCircle" || forceName == "Ghost")
+                : Identity.IsSummon();
 
             int langIdx = 1;
-            try
-            {
-                langIdx = PlayerPrefs.GetInt("systemLanguageIndex", 1);
-            }
+            try { langIdx = PlayerPrefs.GetInt("systemLanguageIndex", 1); }
             catch (Exception) { }
 
-            bool isSummon = Identity.IsSummon();
-            int cid = characterId.HasValue ? characterId.Value : 0;
+            AzureVoiceSpec spec = DefaultCast(who, summon, langIdx);
+            spec.Who = who;
+            spec.Custom = Voices.AzureVoiceFor(who);
+            return spec;
+        }
 
-            if (isSummon || cid == 992 || cid == 9920)
+        // The game's own cast, read out of AzureVoiceManager_PersonalAPI.InitTTSVoice
+        // (the path the base game takes when a player supplies their own Azure key).
+        // It is organised by LEVEL there; here it is by character, which is how the
+        // mod knows who is talking:
+        //   Level 1 main, and both hub girls        -> Jane   (pitch 1.2, rate 1.3)
+        //   Level 2 main                            -> Amber  (pitch 1.2)
+        //   Level 2 magic circle, and the ghost     -> Davis  (pitch 1.3)
+        //   Level 3 main, and Level 4 (which reuses -> Nancy  (pitch 1.1)
+        //     Level 3's entry verbatim)
+        // Until 5.6 the hub girls got Nancy, the fallback; the game gives them the
+        // Level 1 entry. The ghost speaks as the magic circle does: in play
+        // Identity.IsSummon() is true for her, and the game's own Speak() gives
+        // every character id above 10 the level's SECOND voice, which on Level 2
+        // is the circle's. The Japanese Nancy cast
+        // (Nanami) is tuned 1.05 / 0.9 in the game, not the +15% / +10% the old
+        // table carried. The old table also keyed on character ids that do not
+        // exist in the enum (10, 991, 9910...) and missed some that do (9915, 9919),
+        // so it now keys on the resolved character name instead.
+        internal static AzureVoiceSpec DefaultCast(string who, bool summon, int langIdx)
+        {
+            // The game's raw numbers, copied verbatim from
+            // AzureVoiceManager_PersonalAPI.InitTTSVoice, and converted to SSML the
+            // way the game's own voice library converts them (RtPitch / RtRate).
+            // Until this was checked against the game's code, the table held
+            // hand-converted percentages - and every speed-up in it was DOUBLE what
+            // the game plays, because the library halves them. Storing the raw
+            // values keeps the cast faithful by construction.
+            AzureVoiceSpec s;
+            if (summon || who == "MagicCircle" || who == "Ghost")
+                s = Cast(langIdx, "zh-CN-XiaoxiaoNeural", 0.95f, 0.9f, "es-MX-PelayoNeural", 0.9f, 0.8f,
+                    "ja-JP-KeitaNeural", 0.9f, 0.9f, "en-US-DavisNeural", 1.3f, 1.0f);
+            else if (who == "Eddie" || who == "IRLGirl" || who == "ParrotGirl")
+                s = Cast(langIdx, "zh-CN-XiaoyiNeural", 1.0f, 1.0f, "es-MX-LarissaNeural", 1.1f, 1.2f,
+                    "ja-JP-MayuNeural", 1.2f, 1.1f, "en-US-JaneNeural", 1.2f, 1.3f);
+            else if (who == "Elysia")
+                s = Cast(langIdx, "zh-CN-XiaomengNeural", 1.1f, 1.0f, "es-MX-CarlotaNeural", 1.15f, 1.1f,
+                    "ja-JP-ShioriNeural", 1.15f, 1.1f, "en-US-AmberNeural", 1.2f, 1.0f);
+            else
+                s = Cast(langIdx, "zh-CN-XiaoyanNeural", 0.95f, 1.0f, "es-MX-BeatrizNeural", 1.1f, 1.1f,
+                    "ja-JP-NanamiNeural", 1.05f, 0.9f, "en-US-NancyNeural", 1.1f, 1.0f);
+
+            // The game lifts these voices off their natural pitch and pace - Jane
+            // is raised 20% and sped up 15%. Faithful, and on by default, but it is
+            // part of what sounds synthetic, so it can be switched off to hear the
+            // same voices as they were built.
+            if (Plugin.CfgAzureOriginalTuning != null && !Plugin.CfgAzureOriginalTuning.Value)
             {
-                switch (langIdx)
-                {
-                    case 0: return new AzureVoiceSpec { VoiceName = "zh-CN-XiaoxiaoNeural", Language = "zh-CN", PitchFormatted = "-5%", RateFormatted = "-10%", Pitch = 1.0f };
-                    case 2: return new AzureVoiceSpec { VoiceName = "es-MX-PelayoNeural", Language = "es-MX", PitchFormatted = "-10%", RateFormatted = "-20%", Pitch = 1.0f };
-                    case 3: return new AzureVoiceSpec { VoiceName = "ja-JP-KeitaNeural", Language = "ja-JP", PitchFormatted = "-10%", RateFormatted = "-10%", Pitch = 1.0f };
-                    default: return new AzureVoiceSpec { VoiceName = "en-US-DavisNeural", Language = "en-US", PitchFormatted = "+30%", RateFormatted = "+0%", Pitch = 1.0f };
-                }
+                s.PitchFormatted = "+0%";
+                s.RateFormatted = "+0%";
             }
+            return s;
+        }
 
-            if (cid == 1 || cid == 10 || cid == 11 || cid == 12 || cid == 991 || cid == 9910 || cid == 9911 || cid == 9912)
-            {
-                switch (langIdx)
-                {
-                    case 0: return new AzureVoiceSpec { VoiceName = "zh-CN-XiaoyiNeural", Language = "zh-CN", PitchFormatted = "+0%", RateFormatted = "+0%", Pitch = 1.0f };
-                    case 2: return new AzureVoiceSpec { VoiceName = "es-MX-LarissaNeural", Language = "es-MX", PitchFormatted = "+10%", RateFormatted = "+20%", Pitch = 1.0f };
-                    case 3: return new AzureVoiceSpec { VoiceName = "ja-JP-MayuNeural", Language = "ja-JP", PitchFormatted = "+20%", RateFormatted = "+10%", Pitch = 1.0f };
-                    default: return new AzureVoiceSpec { VoiceName = "en-US-JaneNeural", Language = "en-US", PitchFormatted = "+20%", RateFormatted = "+30%", Pitch = 1.0f };
-                }
-            }
-
-            if (cid == 2 || cid == 20 || cid == 21 || cid == 22 || cid == 9921 || cid == 9922)
-            {
-                switch (langIdx)
-                {
-                    case 0: return new AzureVoiceSpec { VoiceName = "zh-CN-XiaomengNeural", Language = "zh-CN", PitchFormatted = "+10%", RateFormatted = "+0%", Pitch = 1.0f };
-                    case 2: return new AzureVoiceSpec { VoiceName = "es-MX-CarlotaNeural", Language = "es-MX", PitchFormatted = "+15%", RateFormatted = "+10%", Pitch = 1.0f };
-                    case 3: return new AzureVoiceSpec { VoiceName = "ja-JP-ShioriNeural", Language = "ja-JP", PitchFormatted = "+15%", RateFormatted = "+10%", Pitch = 1.0f };
-                    default: return new AzureVoiceSpec { VoiceName = "en-US-AmberNeural", Language = "en-US", PitchFormatted = "+20%", RateFormatted = "+0%", Pitch = 1.0f };
-                }
-            }
-
-            if (cid == 3 || cid == 30 || cid == 31 || cid == 32 || cid == 993 || cid == 9930 || cid == 9931 || cid == 9932)
-            {
-                switch (langIdx)
-                {
-                    case 0: return new AzureVoiceSpec { VoiceName = "zh-CN-XiaoyanNeural", Language = "zh-CN", PitchFormatted = "-5%", RateFormatted = "+0%", Pitch = 1.0f };
-                    case 2: return new AzureVoiceSpec { VoiceName = "es-MX-BeatrizNeural", Language = "es-MX", PitchFormatted = "+10%", RateFormatted = "+10%", Pitch = 1.0f };
-                    case 3: return new AzureVoiceSpec { VoiceName = "ja-JP-NanamiNeural", Language = "ja-JP", PitchFormatted = "+15%", RateFormatted = "+10%", Pitch = 1.0f };
-                    default: return new AzureVoiceSpec { VoiceName = "en-US-NancyNeural", Language = "en-US", PitchFormatted = "+10%", RateFormatted = "+0%", Pitch = 1.0f };
-                }
-            }
-
+        static AzureVoiceSpec Cast(int langIdx,
+            string zh, float zhP, float zhR, string es, float esP, float esR,
+            string ja, float jaP, float jaR, string en, float enP, float enR)
+        {
+            string v;
+            float p, r;
             switch (langIdx)
             {
-                case 0: return new AzureVoiceSpec { VoiceName = "zh-CN-XiaoyanNeural", Language = "zh-CN", PitchFormatted = "-5%", RateFormatted = "+0%", Pitch = 1.0f };
-                case 2: return new AzureVoiceSpec { VoiceName = "es-MX-BeatrizNeural", Language = "es-MX", PitchFormatted = "+10%", RateFormatted = "+10%", Pitch = 1.0f };
-                case 3: return new AzureVoiceSpec { VoiceName = "ja-JP-NanamiNeural", Language = "ja-JP", PitchFormatted = "+15%", RateFormatted = "+10%", Pitch = 1.0f };
-                default: return new AzureVoiceSpec { VoiceName = "en-US-NancyNeural", Language = "en-US", PitchFormatted = "+10%", RateFormatted = "+0%", Pitch = 1.0f };
+                case 0: v = zh; p = zhP; r = zhR; break;
+                case 2: v = es; p = esP; r = esR; break;
+                case 3: v = ja; p = jaP; r = jaR; break;
+                default: v = en; p = enP; r = enR; break;
             }
+            AzureVoiceSpec s = new AzureVoiceSpec();
+            s.VoiceName = v;
+            s.Language = v.Substring(0, 5);
+            s.PitchFormatted = RtPitch(p);
+            s.RateFormatted = RtRate(r);
+            s.Pitch = 1.0f;
+            return s;
+        }
+
+        // The game's voice library (Crosstales RT-Voice, VoiceProviderAzure.
+        // prepareText, read from its IL) turns a pitch into (pitch - 1) as a
+        // percentage, but a rate into (rate - 1) * 0.5 when it is above 1 and
+        // (rate - 1) when it is below. So the game's "rate 1.3" is +15%, not +30%.
+        // The mod sent +30% from 5.3 until 5.6, and with 5.6's speaking styles
+        // (which already speak about 15% faster) stacked on top, Eddie's voice ran
+        // at 1.5x her natural speed.
+        static string RtPitch(float pitch)
+        {
+            return RtPercent(pitch - 1f);
+        }
+
+        static string RtRate(float rate)
+        {
+            return RtPercent(rate > 1f ? (rate - 1f) * 0.5f : rate - 1f);
+        }
+
+        static string RtPercent(float v)
+        {
+            int pct = (int)Math.Round(v * 100f, MidpointRounding.AwayFromZero);
+            return pct >= 0 ? "+" + pct + "%" : pct + "%";
         }
 
         private static CachedVoice GetOrCreateVoice(string voiceName, int speakerId)
@@ -505,95 +555,295 @@ namespace AI2UCustomAI
 
         public static IEnumerator SynthesizeAzureCloud(string text, Action<AudioClip> done)
         {
+            IEnumerator e = SynthesizeAzureCloud(text, done, null, false, null);
+            while (e.MoveNext()) yield return e.Current;
+        }
+
+        // test: a menu test. No speaking style (a test line has no mood), and no
+        // in-game notices - the test reports AzureTts's outcome itself.
+        //
+        // Every exit records what happened in AzureTts.Last*. That record is the
+        // whole point of this rewrite: the old version fell back to the offline
+        // voice on ANY failure and returned a clip as if Azure had spoken, so the
+        // test button said "Works!" over a robotic voice and a player had no way
+        // to know Azure had never been reached. See AzureTts.cs for the reports
+        // this traced back to.
+        public static IEnumerator SynthesizeAzureCloud(string text, Action<AudioClip> done, string forceName, bool test)
+        {
+            IEnumerator e = SynthesizeAzureCloud(text, done, forceName, test, null);
+            while (e.MoveNext()) yield return e.Current;
+        }
+
+        // forceName: voice this character (a Voices.Names entry) whoever is on
+        // screen - the Voice tab's per-character play buttons. test: a menu test,
+        // so no speaking style (a test line has no mood) and no in-game notice.
+        // o: this call's own outcome. A caller that needs to know what happened -
+        // the tests - passes one and reads it; it is also published to
+        // AzureTts.Last* for the Voice tab's status line.
+        //
+        // The old version fell back to the offline voice on ANY failure and
+        // returned that clip as if Azure had spoken, so the test said "Works!"
+        // over a robotic voice and nobody could tell Azure had never been
+        // reached. See AzureTts.cs for the three reports this traced back to.
+        public static IEnumerator SynthesizeAzureCloud(string text, Action<AudioClip> done, string forceName, bool test, AzureOutcome o)
+        {
+            if (o == null) o = new AzureOutcome();
             if (string.IsNullOrEmpty(text))
             {
                 done(null);
                 yield break;
             }
 
-            string key = Plugin.CfgGameVoiceKey != null ? Plugin.CfgGameVoiceKey.Value.Trim() : "";
-            string region = Plugin.CfgGameVoiceRegion != null ? Plugin.CfgGameVoiceRegion.Value.Trim() : "";
+            string key = AzureTts.EffectiveKey();
+
+            string rawRegion = Plugin.CfgGameVoiceRegion != null ? (Plugin.CfgGameVoiceRegion.Value ?? "").Trim() : "";
+            string region = AzureTts.NormalizeRegion(rawRegion);
+            if (region.Length == 0)
+            {
+                try { region = AzureTts.NormalizeRegion(Communicator.APIKey_UserPersonalTTS_Region); } catch (Exception) { }
+            }
+            if (region.Length == 0) region = "eastus";
+
+            // A region that had to be interpreted - a pasted endpoint URL, or
+            // "North Central US" - is written back as the code the mod is actually
+            // using, so the Voice tab stops showing something it is not.
+            if (rawRegion.Length > 0 && rawRegion != region && Plugin.CfgGameVoiceRegion != null)
+            {
+                Plugin.Log.LogInfo("Azure TTS: read the region \"" + rawRegion + "\" as \"" + region + "\".");
+                Plugin.CfgGameVoiceRegion.Value = region;
+                Plugin.SaveCfg();
+                OverlayMenu.SyncBuffer("GameVoiceRegion", region);
+            }
 
             if (string.IsNullOrEmpty(key))
             {
-                try { key = Communicator.APIKey_UserPersonalTTS; } catch (Exception) { }
-            }
-            if (string.IsNullOrEmpty(region))
-            {
-                try { region = Communicator.APIKey_UserPersonalTTS_Region; } catch (Exception) { }
-            }
-            if (string.IsNullOrEmpty(region)) region = "eastus";
-
-            if (string.IsNullOrEmpty(key))
-            {
-                Plugin.Log.LogWarning("Azure TTS: No Azure Speech key provided; falling back to local Overtone voice.");
-                IEnumerator fb = SynthesizeLocalOvertone(text, done);
-                while (fb.MoveNext()) yield return fb.Current;
+                o.Problem = "no Azure Speech key is set.";
+                IEnumerator nk = FallBackToLocal(text, done, test, o);
+                while (nk.MoveNext()) yield return nk.Current;
                 yield break;
             }
 
-            int? charId = Identity.CharacterId();
-            AzureVoiceSpec spec = GetAzureVoiceSpec(charId);
+            AzureTts.UseKey(key);
 
-            string escaped = SecurityElement.Escape(text);
-            string ssml = string.Format(
-                "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{0}'>"
-                + "<voice name='{1}'>"
-                + "<prosody pitch='{2}' rate='{3}'>{4}</prosody>"
-                + "</voice></speak>",
-                spec.Language, spec.VoiceName, spec.PitchFormatted, spec.RateFormatted, escaped);
-
-            string url = "https://" + region + ".tts.speech.microsoft.com/cognitiveservices/v1";
-            UnityWebRequest req = new UnityWebRequest(url, "POST");
-            byte[] payload = Encoding.UTF8.GetBytes(ssml);
-            req.uploadHandler = new UploadHandlerRaw(payload);
-            req.downloadHandler = new DownloadHandlerBuffer();
-            req.SetRequestHeader("Content-Type", "application/ssml+xml");
-            req.SetRequestHeader("X-Microsoft-OutputFormat", "audio-16khz-128kbitrate-mono-mp3");
-            req.SetRequestHeader("Ocp-Apim-Subscription-Key", key);
-            req.SetRequestHeader("User-Agent", "AI2UCustomAI");
-
-            yield return req.SendWebRequest();
-
-            if (req.result == UnityWebRequest.Result.Success && req.downloadHandler != null && req.downloadHandler.data != null && req.downloadHandler.data.Length > 1024)
+            // The region's voice catalogue, fetched once. It doubles as a free test
+            // of the key: a 401 here means the region is wrong, and it is repaired
+            // before a line is spent on it.
+            if (AzureTts.Catalog(region) == null && AzureTts.CatalogFailure(region) == 0)
             {
-                byte[] audioBytes = req.downloadHandler.data;
+                IEnumerator cat = AzureTts.LoadCatalog(region, key);
+                while (cat.MoveNext()) yield return cat.Current;
+            }
+
+            bool regionTried = false;
+            if (AzureTts.RegionLooksWrong(AzureTts.CatalogFailure(region), region))
+            {
+                regionTried = true;
+                string better = null;
+                IEnumerator rep = AzureTts.RepairRegion(key, region, delegate (string r) { better = r; });
+                while (rep.MoveNext()) yield return rep.Current;
+                if (better != null)
+                {
+                    region = AdoptRegion(region, better, test, o);
+                    IEnumerator cat2 = AzureTts.LoadCatalog(region, key);
+                    while (cat2.MoveNext()) yield return cat2.Current;
+                }
+                else if (AzureTts.KnownRegion(key) == region)
+                {
+                    // The key does belong here - the 401 on record is stale.
+                    AzureTts.KeyProvenIn(region);
+                    IEnumerator cat3 = AzureTts.LoadCatalog(region, key);
+                    while (cat3.MoveNext()) yield return cat3.Current;
+                }
+            }
+
+            AzureVoiceSpec spec = GetAzureVoiceSpec(Identity.CharacterId(), forceName);
+            string voice = spec.VoiceName, lang = spec.Language, pitch = spec.PitchFormatted, rate = spec.RateFormatted;
+            bool custom = false;
+
+            if (!string.IsNullOrEmpty(spec.Custom))
+            {
+                string problem;
+                string resolved = AzureTts.ResolveName(spec.Custom, region, out problem);
+                if (resolved != null)
+                {
+                    // A voice the player chose is heard as it was built. The
+                    // original cast's pitch and pace offsets were tuned for those
+                    // four voices and would distort any other.
+                    voice = resolved;
+                    lang = AzureTts.LocaleOf(resolved, region);
+                    pitch = "+0%";
+                    rate = "+0%";
+                    custom = true;
+                }
+                else
+                {
+                    o.Note = Voices.LabelFor(spec.Who) + ": " + problem
+                        + " Using her original voice (" + spec.VoiceName + ") instead.";
+                    if (!test) AzureTts.Announce(o.Note);
+                }
+            }
+
+            bool expressive = !test && Plugin.CfgAzureExpressive != null && Plugin.CfgAzureExpressive.Value;
+            string style = expressive ? AzureTts.StyleFor(AzureTts.Find(region, voice)) : null;
+
+            bool voiceTried = false;
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                // A speaking style carries its own pacing - cheerful and frightened
+                // speech are about 15% faster on their own, measured - so it
+                // REPLACES the cast's speed boost instead of stacking on it. With
+                // both, Jane spoke at 1.5x her natural speed; with the style alone
+                // she keeps the game's pace (1.15x) and gains the emotion.
+                string sendRate = style != null ? "+0%" : rate;
+                string ssml = AzureTts.BuildSsml(lang, voice, pitch, sendRate, style, text);
+                UnityWebRequest req = new UnityWebRequest(AzureTts.TtsUrl(region), "POST");
+                req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(ssml));
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.SetRequestHeader("Content-Type", "application/ssml+xml");
+                // 24 kHz, not 16: Azure's neural voices are built at 24 kHz, and
+                // 16 kHz discards everything above 8 kHz - the breath and
+                // brightness that separate a present voice from a telephone one.
+                req.SetRequestHeader("X-Microsoft-OutputFormat", "audio-24khz-96kbitrate-mono-mp3");
+                req.SetRequestHeader("Ocp-Apim-Subscription-Key", key);
+                req.SetRequestHeader("User-Agent", "AI2UCustomAI");
+                req.timeout = 25;
+
+                yield return req.SendWebRequest();
+
+                long code = req.responseCode;
+                string err = req.error;
+                byte[] audio = null;
+                if (req.result == UnityWebRequest.Result.Success && req.downloadHandler != null
+                    && req.downloadHandler.data != null && req.downloadHandler.data.Length > 1024)
+                    audio = req.downloadHandler.data;
                 req.Dispose();
 
-                string tmpFile = Path.Combine(Application.temporaryCachePath, "azureTTS_" + Guid.NewGuid().ToString("N") + ".mp3");
-                File.WriteAllBytes(tmpFile, audioBytes);
-
-                AudioClip clip = null;
-                using (UnityWebRequest clipReq = UnityWebRequestMultimedia.GetAudioClip("file://" + tmpFile.Replace("\\", "/"), AudioType.MPEG))
+                if (audio != null)
                 {
-                    yield return clipReq.SendWebRequest();
-                    if (clipReq.result == UnityWebRequest.Result.Success)
+                    AudioClip clip = null;
+                    IEnumerator dec = DecodeMp3(audio, delegate (AudioClip c) { clip = c; });
+                    while (dec.MoveNext()) yield return dec.Current;
+
+                    if (clip != null)
                     {
-                        clip = DownloadHandlerAudioClip.GetContent(clipReq);
+                        AzureTts.KeyProvenIn(region);
+                        o.Ok = true;
+                        o.Voice = voice;
+                        o.Style = style;
+                        o.Region = region;
+                        AzureTts.Publish(o);
+                        if (Plugin.CfgLogPayloads != null && Plugin.CfgLogPayloads.Value)
+                            Plugin.Log.LogInfo(string.Format("GameTts (Azure): {0}{1} @ {2}, {3} chars, {4:F1}s",
+                                voice, style != null ? " [" + style + "]" : "", region, text.Length, clip.length));
+                        done(clip);
+                        yield break;
+                    }
+                    o.Problem = "Azure sent audio the game could not decode.";
+                    break;
+                }
+
+                // Rejected here: move to the region this key belongs to - found by
+                // a sweep, or already known from one earlier this session - and
+                // try again there.
+                if (!regionTried && AzureTts.RejectsRegion(code, region))
+                {
+                    regionTried = true;
+                    string better = null;
+                    IEnumerator rep2 = AzureTts.RepairRegion(key, region, delegate (string r) { better = r; });
+                    while (rep2.MoveNext()) yield return rep2.Current;
+                    if (better != null)
+                    {
+                        region = AdoptRegion(region, better, test, o);
+                        continue;
                     }
                 }
 
-                try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch (Exception) { }
-
-                if (clip != null)
+                // Her chosen voice was refused: she keeps HER original voice for
+                // this line rather than losing Azure altogether.
+                if (code == 400 && custom && !voiceTried)
                 {
-                    if (Plugin.CfgLogPayloads != null && Plugin.CfgLogPayloads.Value)
-                    {
-                        Plugin.Log.LogInfo(string.Format("GameTts (Azure Cloud): {0} chars={1} {2:F1}s audio", spec.VoiceName, text.Length, clip.length));
-                    }
-                    done(clip);
-                    yield break;
+                    voiceTried = true;
+                    o.Note = Voices.LabelFor(spec.Who) + ": region " + region + " refused the voice \""
+                        + voice + "\". Using her original voice (" + spec.VoiceName + ") instead.";
+                    if (!test) AzureTts.Announce(o.Note);
+                    voice = spec.VoiceName;
+                    lang = spec.Language;
+                    pitch = spec.PitchFormatted;
+                    rate = spec.RateFormatted;
+                    custom = false;
+                    style = expressive ? AzureTts.StyleFor(AzureTts.Find(region, voice)) : null;
+                    continue;
                 }
-            }
-            else
-            {
-                Plugin.Log.LogWarning("Azure TTS error: " + req.error + "; falling back to local Overtone voice.");
-                req.Dispose();
+
+                // Defensive: Azure ignores unknown styles today, but if a style
+                // ever causes a refusal, the line matters more than the style.
+                if (code == 400 && style != null)
+                {
+                    style = null;
+                    continue;
+                }
+
+                o.Problem = AzureTts.Explain(code, region, voice, err);
+                break;
             }
 
-            // Fallback to local overtone
-            IEnumerator fallback = SynthesizeLocalOvertone(text, done);
-            while (fallback.MoveNext()) yield return fallback.Current;
+            IEnumerator fb = FallBackToLocal(text, done, test, o);
+            while (fb.MoveNext()) yield return fb.Current;
+        }
+
+        // Adopts the region a key turned out to belong to, saves it, and says so.
+        static string AdoptRegion(string was, string found, bool test, AzureOutcome o)
+        {
+            if (Plugin.CfgGameVoiceRegion != null)
+            {
+                Plugin.CfgGameVoiceRegion.Value = found;
+                Plugin.SaveCfg();
+            }
+            // The panel keeps its own copy of every field until Save; without this
+            // the next Save would write the old, rejected region straight back.
+            OverlayMenu.SyncBuffer("GameVoiceRegion", found);
+
+            o.Note = "region corrected from \"" + was + "\" to \"" + found
+                + "\" - that is where this key belongs. Saved.";
+            Plugin.Log.LogWarning("Azure TTS: " + o.Note);
+            if (!test) Plugin.Toast("Azure voice: " + o.Note, 8f);
+            return found;
+        }
+
+        // The offline voice, as a LABELLED fallback. It still speaks the line -
+        // silence would be worse - but the outcome says Azure did not, and outside
+        // a test the player is told once why.
+        static IEnumerator FallBackToLocal(string text, Action<AudioClip> done, bool test, AzureOutcome o)
+        {
+            o.FellBack = true;
+            if (o.Problem != null)
+            {
+                if (!test) AzureTts.Announce(o.Problem + " Playing the offline voice until it is fixed.");
+                else Plugin.Log.LogWarning("Azure TTS (test): " + o.Problem);
+            }
+            AzureTts.Publish(o);
+            IEnumerator loc = SynthesizeLocalOvertone(text, done);
+            while (loc.MoveNext()) yield return loc.Current;
+        }
+
+        static IEnumerator DecodeMp3(byte[] audio, Action<AudioClip> done)
+        {
+            string tmpFile = Path.Combine(Application.temporaryCachePath, "azureTTS_" + Guid.NewGuid().ToString("N") + ".mp3");
+            bool wrote = false;
+            try { File.WriteAllBytes(tmpFile, audio); wrote = true; }
+            catch (Exception e) { Plugin.Log.LogWarning("Azure TTS: could not write audio (" + e.Message + ")."); }
+            if (!wrote) { done(null); yield break; }
+
+            AudioClip clip = null;
+            using (UnityWebRequest clipReq = UnityWebRequestMultimedia.GetAudioClip("file://" + tmpFile.Replace("\\", "/"), AudioType.MPEG))
+            {
+                yield return clipReq.SendWebRequest();
+                if (clipReq.result == UnityWebRequest.Result.Success)
+                    clip = DownloadHandlerAudioClip.GetContent(clipReq);
+            }
+
+            try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch (Exception) { }
+            done(clip);
         }
 
         public static string FailureLabel()

@@ -975,10 +975,10 @@ namespace AI2UCustomAI
                     + "form is the one that answers. The voice test synthesises a line and plays it.", sub);
                 GUILayout.BeginHorizontal();
                 bool hitText = GUILayout.Button(_busyText ? "Testing..." : "Test text", GUILayout.Height(26f));
-                bool hitVoice = GUILayout.Button(_busyVoice ? "Testing..." : "Test voice", GUILayout.Height(26f));
+                bool hitVoice = GUILayout.Button(_busyVoice || _azBusy ? "Testing..." : "Test voice", GUILayout.Height(26f));
                 GUILayout.EndHorizontal();
                 if (hitText && !_busyText) StartTest(false);
-                if (hitVoice && !_busyVoice) StartTest(true);
+                if (hitVoice && !_busyVoice && !_azBusy) StartTest(true);
                 Result("Text", _resText, _resTextColor);
                 Result("Voice", _resVoice, _resVoiceColor);
 
@@ -1086,13 +1086,15 @@ namespace AI2UCustomAI
 
                 KeyRow("GameVoiceKey", "Azure Speech key", isAzure);
                 TextRow("GameVoiceRegion", "Azure Speech region", 0f, isAzure);
-                if (isAzure)
-                {
-                    if (string.IsNullOrEmpty(Get("GameVoiceKey")))
-                        PlainNote("  Status: Selected, but Azure Speech key is empty. Click the button above to get a free key, or switch to Local Original.");
-                    else
-                        PlainNote("  Status: ACTIVE (Azure Neural Speech).");
-                }
+                PlainNote("  The region is where your Speech resource was created. The portal's Keys and "
+                    + "Endpoint page shows it next to the key, and a key ONLY works in its own region. The "
+                    + "code (northcentralus), the name (North Central US) or the endpoint URL all work - and "
+                    + "if Azure rejects the key, the mod finds the right region itself and saves it.");
+                Bool(Plugin.CfgAzureExpressive,
+                    "Expressive delivery - each line spoken in a style that fits her mood", isAzure);
+                Bool(Plugin.CfgAzureOriginalTuning,
+                    "Keep the original game's pitch and speed tuning (off sounds more natural)", isAzure);
+                if (isAzure) AzureStatus();
 
                 GUILayout.Space(6f);
 
@@ -1114,7 +1116,10 @@ namespace AI2UCustomAI
                 Bool(Plugin.CfgTtsNormalize, "Normalise loudness across voices", isCustom);
                 Bool(Plugin.CfgSpeakActions, "Read *actions* aloud too (off: speak only her words)", true);
 
-                PerCharacterVoices(isCustom || isAzure);
+                // Azure has its own per-character voices (see Voices.cs for why
+                // they are no longer shared with the Custom Endpoint fields).
+                if (isAzure) AzureCharacterVoices();
+                else PerCharacterVoices(isCustom);
             }
 
             // ================= MODEL =========================================
@@ -1504,6 +1509,7 @@ namespace AI2UCustomAI
             if (text == null) return;
             GUIStyle s = new GUIStyle(GUI.skin.label);
             s.normal.textColor = c;
+            s.wordWrap = true;
             GUILayout.Label("  " + what + ": " + text, s);
         }
 
@@ -1763,6 +1769,7 @@ namespace AI2UCustomAI
                     Plugin.CfgGrokSpeed, Plugin.CfgGrokSampleRate,
                     Plugin.CfgGrokNormalize, Plugin.CfgTtsNormalize,
                     Plugin.CfgSpeakActions, Plugin.CfgGrokToggleKey,
+                    Plugin.CfgAzureExpressive, Plugin.CfgAzureOriginalTuning,
                 };
                 case 2: return new ConfigEntryBase[]
                 {
@@ -2211,6 +2218,355 @@ namespace AI2UCustomAI
         // because those are account settings and a second key is just a second
         // bill. An empty row inherits the general voice above, which keeps the
         // fallback something the user has definitely configured.
+        // ---------------------------------------------------------------
+        // Azure: status, per-character voices, the voice browser
+        // ---------------------------------------------------------------
+        //
+        // The old Azure section said "Status: ACTIVE" whenever a key had been
+        // typed, and Test Voice said "Works!" whenever ANY audio came back - which
+        // it always did, because a failed Azure request quietly fell back to the
+        // offline voice. So the panel never told a player the one thing they
+        // needed to know. Everything below reads what actually happened.
+        static string _azPick;
+        static Vector2 _azPickScroll;
+        static bool _azBusy;
+        static readonly Dictionary<string, string> _azResult = new Dictionary<string, string>();
+        static readonly Dictionary<string, Color> _azResultColor = new Dictionary<string, Color>();
+
+        // Unsaved edits first, so the voice browser works on what is in the boxes
+        // without saving the whole panel behind the player's back; then whatever
+        // the voice itself would use, including the game's own personal-TTS key.
+        static string AzureKeyNow()
+        {
+            string k = Get("GameVoiceKey").Trim();
+            return k.Length > 0 ? k : AzureTts.EffectiveKey();
+        }
+
+        static string AzureRegionNow()
+        {
+            string r = AzureTts.NormalizeRegion(Get("GameVoiceRegion"));
+            if (r.Length == 0 && Plugin.CfgGameVoiceRegion != null) r = AzureTts.NormalizeRegion(Plugin.CfgGameVoiceRegion.Value);
+            if (r.Length == 0)
+            {
+                try { r = AzureTts.NormalizeRegion(Communicator.APIKey_UserPersonalTTS_Region); } catch (Exception) { }
+            }
+            return r.Length > 0 ? r : "eastus";
+        }
+
+        static int LangIdx()
+        {
+            try { return PlayerPrefs.GetInt("systemLanguageIndex", 1); }
+            catch (Exception) { return 1; }
+        }
+
+        // The Voice tab draws several times a frame, and checking a typed name
+        // walks the whole catalogue. Remember each row's answer until its text,
+        // the region or the catalogue changes.
+        static readonly Dictionary<string, string[]> _azResolveCache = new Dictionary<string, string[]>();
+        static List<AzureVoice> _azResolveCat;
+
+        static string CachedResolve(string bufKey, string typed, string region, List<AzureVoice> cat, out string problem)
+        {
+            if (!ReferenceEquals(cat, _azResolveCat))
+            {
+                _azResolveCache.Clear();
+                _azResolveCat = cat;
+            }
+            string[] e;
+            if (_azResolveCache.TryGetValue(bufKey, out e) && e[0] == typed && e[1] == region)
+            {
+                problem = e[3];
+                return e[2];
+            }
+            string resolved = AzureTts.ResolveName(typed, region, out problem);
+            _azResolveCache[bufKey] = new[] { typed, region, resolved, problem };
+            return resolved;
+        }
+
+        static void AzureStatus()
+        {
+            GUIStyle st = new GUIStyle(GUI.skin.label);
+            st.wordWrap = true;
+
+            if (AzureKeyNow().Length == 0)
+            {
+                st.normal.textColor = new Color(1f, 0.72f, 0.25f);
+                GUILayout.Label("  Status: selected, but there is no Azure key yet - press the button above to "
+                    + "make a free one, paste it in, and Save.", st);
+                return;
+            }
+
+            if (AzureTts.LastOk)
+            {
+                st.normal.textColor = Color.green;
+                GUILayout.Label("  Last line: spoken by Azure - " + AzureTts.LastVoice
+                    + (AzureTts.LastStyle != null ? " (" + AzureTts.LastStyle + ")" : "")
+                    + " in " + AzureTts.LastRegion + ".", st);
+            }
+            else if (AzureTts.LastFellBack && AzureTts.LastProblem != null)
+            {
+                st.normal.textColor = new Color(1f, 0.35f, 0.35f);
+                GUILayout.Label("  Last line: Azure FAILED - " + AzureTts.LastProblem
+                    + " She spoke it with the offline voice instead.", st);
+            }
+            else
+            {
+                GUILayout.Label("  Status: ready. Press Test voice on the Setup tab, or the play button next "
+                    + "to any character below, to hear Azure and confirm it works.", st);
+            }
+
+            if (AzureTts.LastNote != null)
+            {
+                st.normal.textColor = new Color(1f, 0.85f, 0.4f);
+                GUILayout.Label("  Note: " + AzureTts.LastNote, st);
+            }
+        }
+
+        static void AzureCharacterVoices()
+        {
+            GUILayout.Space(8f);
+            Header("Azure voice per character");
+            PlainNote("  Empty means her ORIGINAL game voice (shown in grey). Type any voice your region "
+                + "offers - a full name like en-US-JennyNeural, or just Jenny - or press the list button "
+                + "to browse them. The play button saves, then speaks as that character. HD voices sound "
+                + "the most natural.");
+
+            string region = AzureRegionNow();
+            List<AzureVoice> cat = AzureTts.Catalog(region);
+            int lang = LangIdx();
+
+            GUIStyle hint = new GUIStyle(GUI.skin.label);
+            hint.wordWrap = true;
+            hint.fontSize = 11;
+
+            for (int i = 0; i < Voices.Names.Length; i++)
+            {
+                string name = Voices.Names[i];
+                string bufKey = AzVoicePrefix + name;
+                AzureVoiceSpec def = GameTts.DefaultCast(name, name == "MagicCircle" || name == "Ghost", lang);
+                // Read before the buttons: a click that opens or closes the list
+                // changes _azPick mid-event, and drawing the list in the same event
+                // would add controls its layout pass never saw.
+                bool pickerOpen = _azPick == name;
+
+                GUILayout.BeginHorizontal();
+                Label(Voices.Labels[i]);
+                string next = TextFieldWithPlaceholder(Get(bufKey), "original: " + def.VoiceName, 270f, true);
+                _buf[bufKey] = next;
+                bool play = GUILayout.Button(_azBusy || _busyVoice ? "..." : "\u25B6", GUILayout.Width(32f));
+                bool pick = GUILayout.Button(_azPick == name ? "\u25B2" : "\u22EF", GUILayout.Width(32f));
+                GUILayout.EndHorizontal();
+
+                // Checked as it is typed, against the region's own list, so a name
+                // the region does not have is caught here rather than in play.
+                string typed = next.Trim();
+                if (cat != null && typed.Length > 0)
+                {
+                    string problem;
+                    string resolved = CachedResolve(bufKey, typed, region, cat, out problem);
+                    if (resolved == null)
+                    {
+                        hint.normal.textColor = new Color(1f, 0.45f, 0.45f);
+                        GUILayout.Label("      " + problem + " Her original voice will be used.", hint);
+                    }
+                    else if (!string.Equals(resolved, typed, StringComparison.OrdinalIgnoreCase))
+                    {
+                        hint.normal.textColor = new Color(0.7f, 0.85f, 1f);
+                        GUILayout.Label("      reads as " + resolved, hint);
+                    }
+                }
+
+                string res;
+                if (_azResult.TryGetValue(name, out res) && res != null)
+                {
+                    hint.normal.textColor = _azResultColor.ContainsKey(name) ? _azResultColor[name] : Color.white;
+                    GUILayout.Label("      " + res, hint);
+                }
+
+                if (play && !_azBusy && !_busyVoice) StartAzureCharacterTest(name);
+                if (pick)
+                {
+                    _azPick = _azPick == name ? null : name;
+                    _azPickScroll = Vector2.zero;
+                    if (_azPick != null && cat == null) StartAzureCatalogLoad();
+                }
+                if (pickerOpen) AzurePicker(name, bufKey, region);
+            }
+
+            PlainNote("  A voice set here follows that character wherever she appears. Voices you choose "
+                + "are spoken at their natural pitch and pace; the original cast keeps the game's tuning "
+                + "unless you switch that off above.");
+        }
+
+        static void AzurePicker(string name, string bufKey, string region)
+        {
+            List<AzureVoice> cat = AzureTts.Catalog(region);
+            if (cat == null)
+            {
+                // Every branch draws one note and one button, so the control count
+                // is the same whatever state the list is in - IMGUI requires that
+                // between an event's layout pass and the event itself.
+                bool noKey = AzureKeyNow().Length == 0;
+                bool busy = !noKey && AzureTts.CatalogBusy(region);
+                long f = AzureTts.CatalogFailure(region);
+                string note;
+                if (noKey) note = "      No Azure key yet - paste it above first.";
+                else if (busy) note = "      Loading the voices region " + region + " offers...";
+                else if (f != 0) note = "      Could not load the voice list for region " + region + " ("
+                    + (f > 0 ? "HTTP " + f : "no connection") + "). Check the key and region - a wrong region "
+                    + "is found and fixed automatically when you load again.";
+                else note = "      The voice list for region " + region + " is not loaded yet.";
+                PlainNote(note);
+
+                bool was = GUI.enabled;
+                GUI.enabled = was && !noKey && !busy;
+                if (GUILayout.Button(busy ? "Loading..." : "Load the voice list for " + region, GUILayout.Width(340f)))
+                    StartAzureCatalogLoad();
+                GUI.enabled = was;
+                return;
+            }
+
+            string filter = Get(bufKey).Trim();
+            List<AzureVoice> list = AzureTts.Suggest(region, filter, 60);
+            PlainNote("      " + cat.Count + " voices in " + region
+                + (filter.Length > 0 ? ", filtered by what is typed (clear the box to see them all)" : "")
+                + ". HD voices first. Click one to use it for " + Voices.LabelFor(name) + ".");
+
+            GUIStyle item = new GUIStyle(GUI.skin.button);
+            item.alignment = TextAnchor.MiddleLeft;
+            item.fontSize = 11;
+
+            _azPickScroll = GUILayout.BeginScrollView(_azPickScroll, GUILayout.Height(220f));
+            for (int i = 0; i < list.Count; i++)
+            {
+                AzureVoice v = list[i];
+                string label = v.ShortName + "     " + (v.LocalName ?? "") + " - " + (v.Gender ?? "")
+                    + (v.IsHD ? " - HD" : "")
+                    + (v.Styles != null && v.Styles.Length > 0 ? " - " + v.Styles.Length + " moods" : "");
+                if (GUILayout.Button(label, item, GUILayout.Height(22f)))
+                {
+                    _buf[bufKey] = v.ShortName;
+                    _azPick = null;
+                    Note(Voices.LabelFor(name) + ": " + v.ShortName + ". Press Save, or the play button to hear it.");
+                }
+            }
+            GUILayout.EndScrollView();
+            if (list.Count == 0) PlainNote("      Nothing in " + region + " matches \"" + filter + "\".");
+        }
+
+        static void StartAzureCatalogLoad()
+        {
+            MonoBehaviour host = HotkeyWatcher.Host;
+            if (host == null) return;
+            host.StartCoroutine(AzureCatalogLoad());
+        }
+
+        static System.Collections.IEnumerator AzureCatalogLoad()
+        {
+            string key = AzureKeyNow();
+            string region = AzureRegionNow();
+            if (key.Length == 0) yield break;
+            AzureTts.UseKey(key);
+
+            System.Collections.IEnumerator a = AzureTts.LoadCatalog(region, key);
+            while (a.MoveNext()) yield return a.Current;
+
+            // Same repair as the synth path: a rejected key usually means the
+            // region is wrong, so find (or recall) the right one rather than fail.
+            if (AzureTts.RegionLooksWrong(AzureTts.CatalogFailure(region), region))
+            {
+                string found = null;
+                System.Collections.IEnumerator d = AzureTts.RepairRegion(key, region, delegate (string r) { found = r; });
+                while (d.MoveNext()) yield return d.Current;
+                if (found != null)
+                {
+                    SyncBuffer("GameVoiceRegion", found);
+                    // Saved only when it belongs to the SAVED key. For a key that is
+                    // still just typed in the box, saving the region alone would
+                    // leave the file holding one key's region next to another key.
+                    if (key == AzureTts.EffectiveKey() && Plugin.CfgGameVoiceRegion != null)
+                    {
+                        Plugin.CfgGameVoiceRegion.Value = found;
+                        Plugin.SaveCfg();
+                        Note("Azure region corrected to " + found + " - that is where this key belongs. Saved.");
+                    }
+                    else
+                        Note("Azure region set to " + found + " - that is where this key belongs. Press Save "
+                            + "to keep the key and the region.");
+                    System.Collections.IEnumerator b = AzureTts.LoadCatalog(found, key);
+                    while (b.MoveNext()) yield return b.Current;
+                }
+            }
+        }
+
+        static void StartAzureCharacterTest(string name)
+        {
+            MonoBehaviour host = HotkeyWatcher.Host;
+            if (host == null) return;
+            Commit();
+            host.StartCoroutine(AzureCharacterTest(name));
+        }
+
+        static System.Collections.IEnumerator AzureCharacterTest(string name)
+        {
+            _azBusy = true;
+            _azResult[name] = "speaking...";
+            _azResultColor[name] = Color.white;
+
+            string regionAtStart = Plugin.CfgGameVoiceRegion != null ? Plugin.CfgGameVoiceRegion.Value : null;
+            AzureOutcome o = new AzureOutcome();
+            AudioClip clip = null;
+            System.Collections.IEnumerator e = GameTts.SynthesizeAzureCloud("Hey. This is how I will sound.",
+                delegate (AudioClip c) { clip = c; }, name, true, o);
+            bool threw = false;
+            while (true)
+            {
+                object cur;
+                try
+                {
+                    if (!e.MoveNext()) break;
+                    cur = e.Current;
+                }
+                catch (Exception ex)
+                {
+                    _azResult[name] = "error: " + ex.Message;
+                    _azResultColor[name] = Color.red;
+                    Plugin.Log.LogError("Azure character test threw: " + ex);
+                    threw = true;
+                    break;
+                }
+                yield return cur;
+            }
+
+            if (!threw)
+            {
+                if (clip != null)
+                {
+                    AudioSource src = UnityEngine.Object.FindObjectOfType<AudioSource>();
+                    if (src != null) src.PlayOneShot(clip);
+                }
+
+                if (o.Ok)
+                {
+                    _azResult[name] = "Azure: " + o.Voice + " in " + o.Region
+                        + (o.Note != null ? ". " + o.Note : ".");
+                    _azResultColor[name] = o.Note != null ? new Color(1f, 0.85f, 0.4f) : Color.green;
+                }
+                else
+                {
+                    _azResult[name] = "Azure FAILED - " + (o.Problem ?? "no audio came back.")
+                        + (clip != null ? " What you heard was the offline voice." : "");
+                    _azResultColor[name] = new Color(1f, 0.35f, 0.35f);
+                }
+            }
+
+            // Only if the test itself moved the region. Unconditionally, this wiped
+            // out a region the player had typed while the test was running.
+            if (Plugin.CfgGameVoiceRegion != null && Plugin.CfgGameVoiceRegion.Value != regionAtStart)
+                SyncBuffer("GameVoiceRegion", Plugin.CfgGameVoiceRegion.Value);
+            _azBusy = false;
+        }
+
         static void PerCharacterVoices(bool enabled = true)
         {
             GUILayout.Space(8f);
@@ -2970,6 +3326,16 @@ namespace AI2UCustomAI
         // value by a single flat key, and a bare "Eddie" would collide the moment
         // anything else wants that name.
         internal const string VoicePrefix = "Voice.";
+        internal const string AzVoicePrefix = "AzVoice.";
+
+        // A value changed underneath the panel - the Azure region, when the mod
+        // finds the one a key really belongs to. The edit buffer has to follow,
+        // or the next Save would write the old, wrong value straight back.
+        internal static void SyncBuffer(string key, string value)
+        {
+            if (key == null) return;
+            _buf[key] = value ?? "";
+        }
 
         static readonly string[] StringKeys = BuildStringKeys();
 
@@ -2982,10 +3348,14 @@ namespace AI2UCustomAI
                 "OocTag", "TimeskipTag", "GameVoiceKey", "GameVoiceRegion"
             };
 
-            string[] all = new string[fixedKeys.Length + Voices.Names.Length];
+            int n = Voices.Names.Length;
+            string[] all = new string[fixedKeys.Length + n * 2];
             Array.Copy(fixedKeys, all, fixedKeys.Length);
-            for (int i = 0; i < Voices.Names.Length; i++)
+            for (int i = 0; i < n; i++)
+            {
                 all[fixedKeys.Length + i] = VoicePrefix + Voices.Names[i];
+                all[fixedKeys.Length + n + i] = AzVoicePrefix + Voices.Names[i];
+            }
             return all;
         }
         static readonly string[] IntKeys =
@@ -3000,6 +3370,8 @@ namespace AI2UCustomAI
             // Resolved through Voices so the set of characters lives in one place.
             if (key != null && key.StartsWith(VoicePrefix, StringComparison.Ordinal))
                 return Voices.Entry(key.Substring(VoicePrefix.Length));
+            if (key != null && key.StartsWith(AzVoicePrefix, StringComparison.Ordinal))
+                return Voices.AzureEntry(key.Substring(AzVoicePrefix.Length));
 
             switch (key)
             {

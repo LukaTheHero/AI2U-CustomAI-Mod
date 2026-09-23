@@ -49,6 +49,20 @@ Bug reports and "it broke on version X" posts are genuinely welcome.[/color][/si
 
 [line]
 
+[size=5][color=#D291BC]■ New in 5.6 — Azure voices actually reach Azure[/color][/size]
+
+[size=4][color=#9B7EBD]"My Azure key does nothing", "Azure sounds robotic" and "the per-girl Azure voices do nothing" turned out to be one bug.[/color][/size]
+
+[list]
+[*][b]Your Azure key now just works.[/b] An Azure Speech key only works in the region it was created in, and the mod assumed [font=Courier New]eastus[/font]. Any other key was refused — and the mod then quietly played the [i]offline[/i] voice while Test voice said "Works!". So a lot of you heard the robotic offline voice and were told it was Azure. Now, if Azure refuses your key, the mod finds your key's region by itself, switches to it and saves it. The region box also accepts the name ("North Central US") or the endpoint URL straight from the portal.
+[*][b]No more silent failures.[/b] If Azure can't speak a line, you get a one-time notice at the top of the screen saying why. [b]Test voice[/b] now names the Azure voice and region that spoke, or says "Azure FAILED", explains why, and tells you when what you heard was the offline voice.
+[*][b]Per-girl Azure voices work.[/b] Azure has its own voice box for each character. Type a full name or just "Jenny", browse every voice your region offers (most natural HD voices first), and press the play button next to any girl to hear her. A voice your region doesn't have is flagged as you type, and she keeps her original voice instead of dropping to the offline one.
+[*][b]Less robotic.[/b] Audio is now 24 kHz instead of 16 kHz, and voices that support it speak each line in a style that matches her mood (cheerful, sad, angry, frightened, shy). A new toggle removes the base game's own pitch/speed boost — Eddie's voice is 20% higher and 15% faster than the voice was built — if you'd rather hear the voices as they were made.
+[*][b]No more chipmunk speed.[/b] Since 5.3 the mod played the original voices twice as fast as the game intended: the game's voice library halves every speed-up, and the mod never did. With 5.6's new speaking styles on top, Eddie ran at 1.5× her natural speed. Every original voice now uses the game's own numbers, and a speaking style replaces the speed-up instead of stacking on it, so she speaks at exactly the game's pace.
+[/list]
+
+[line]
+
 [size=5][color=#D291BC]■ New in 5.5 — Google AI Studio, Grok text, and every prompt is yours[/color][/size]
 
 [size=4][color=#FFCC55][b]First, an apology.[/b] Both 5.4.0 downloads contained the 5.3.0 build, so nobody who installed 5.4 ever received a single 5.4 feature. Three of you caught it before I did. 5.5.0 delivers everything 5.4 promised as well as everything below, and packaging is now a script that reads the version out of the finished zip and refuses to publish a mismatch — run against the broken 5.4 files, it rejects them both.[/color][/size]
@@ -419,7 +433,7 @@ Models I have run successfully:
 
 [list]
 [*][b][color=#E8A5C8]Offline Local Engine (Overtone)[/color][/b] — [color=#7ACC7A][b]100% offline, 0 keys, free[/b][/color] — basic on-device speech synthesizer (Amy, Cori, HFC Female). Functional, but robotic.
-[*][b][color=#E8A5C8]Microsoft Azure Speech — the game's ORIGINAL voice cast[/color][/b] — [color=#FFCC55][b]this one is NOT a Custom Endpoint URL.[/b][/color] It is its own mode: open [b]F9 → Voice[/b] and pick [font=Courier New]○ 2. Cloud Original (Azure)[/font], then enter your Azure [b]key[/b] and [b]region[/b]. Do not paste an Azure URL into the Custom Endpoint box — that box only speaks xAI, ElevenLabs and OpenAI shapes, so an Azure URL there fails quietly and drops you back to the offline voice. [color=#7ACC7A][b]RECOMMENDED, free tier available (500k chars/mo), and it is the real cast the game shipped with[/b][/color]
+[*][b][color=#E8A5C8]Microsoft Azure Speech — the game's ORIGINAL voice cast[/color][/b] — [color=#FFCC55][b]this one is NOT a Custom Endpoint URL.[/b][/color] It is its own mode: open [b]F9 → Voice[/b], pick [font=Courier New]○ 2. Cloud Original (Azure)[/font], enter your Azure [b]key[/b] and [b]region[/b] (both are on the portal's [i]Keys and Endpoint[/i] page), and press Save. Then press [b]Setup → Test voice[/b]: it should say [b]"Works! Azure spoke it"[/b]. A key only works in its own region, but since 5.6 the mod finds the right one itself if you get it wrong. Don't paste an Azure URL into the Custom Endpoint box — that box only speaks xAI, ElevenLabs and OpenAI shapes. [color=#7ACC7A][b]RECOMMENDED, free tier available (500k chars/mo), and it is the real cast the game shipped with[/b][/color]
 [*][b][color=#E8A5C8]xAI (Grok)[/color][/b] — [font=Courier New]https://api.x.ai/v1[/font] — voice [font=Courier New]iris[/font], 26 built-in voices — [color=#7ACC7A][b]TESTED, expressive & affordable[/b][/color]
 [*][b][color=#E8A5C8]ElevenLabs[/color][/b] — [font=Courier New]https://api.elevenlabs.io/v1[/font] — a voice ID from your Voices page — [color=#7ACC7A][b]TESTED, best quality & emotion, costs more[/b][/color]
 [*][b][color=#E8A5C8]OpenAI-compatible[/color][/b] — [font=Courier New]https://api.openai.com/v1[/font] — that provider's voice name — [color=#CCAA55][b]implemented[/b][/color]
@@ -427,10 +441,11 @@ Models I have run successfully:
 
 [spoiler][b]xAI's 26 voices:[/b] carina, zagan, helix, orion, luna, [b]iris[/b], altair, zenith, perseus, helios, lux, kepler, rigel, cosmo, celeste, ursa, sirius, lumen, castor, naksh, atlas, ara, eve, leo, rex, sal[/spoiler]
 
-[color=#E8A5C8][b]Voice is billed separately, per character of dialogue[/b][/color], by whichever provider you use. That is a second meter running alongside your text provider. If a request fails, that line quietly falls back to the local voice rather than going silent.
+[color=#E8A5C8][b]Voice is billed separately, per character of dialogue[/b][/color], by whichever provider you use. That is a second meter running alongside your text provider. If a request fails, that line falls back to the local voice rather than going silent — and since 5.6, an Azure failure also tells you why, once, at the top of the screen.
 
 [size=4][color=#9B7EBD]A voice for each of them[/color][/size]
 [i]New in 3.1.0.[/i] The [b]Voice per character[/b] rows in F9 give every girl her own voice ID, on whichever provider you use. Leave a row empty and she uses the general voice above. Only the voice is per-character — the base URL, API key and model stay shared, so this costs nothing extra and needs no second account. A voice set there follows that character wherever she appears.
+[i]New in 5.6:[/i] in [b]Cloud Original (Azure)[/b] mode the rows are Azure's own. Leave one empty for her original game voice, type any voice your region offers (a full name or just [font=Courier New]Jenny[/font]), or press the list button to browse them, HD voices first. The play button next to each girl saves the settings and speaks as her.
 
 [size=4][color=#9B7EBD]ElevenLabs on a free account[/color][/size]
 Voice [b]Library[/b] voices need a [b]paid[/b] ElevenLabs plan when used via the API. On the free tier they return [font=Courier New]402[/font] and the Test button says [b]"Paid plan"[/b] — that is a billing limit, not a broken mod.
@@ -589,7 +604,7 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [list]
 [*]This routes dialogue away from the developers' metered servers, so treat it as a [b]personal-use tool[/b].
 [*][color=#E8A5C8][b]Keep your API keys private.[/b][/color] They are billable, and anyone holding the file can spend your credit. Never share your filled-in config.
-[*]Source is available — 30 C# files, buildable with the .NET Framework compiler that already ships with Windows. No Visual Studio needed.
+[*]Source is available — 31 C# files, buildable with the .NET Framework compiler that already ships with Windows. No Visual Studio needed.
 [*][color=#7ACC7A][b]This release is the same binary I run myself[/b][/color], for both stores, with nothing compiled out of it. The only bytes that differ from my own build are the compile timestamp.
 [*]Unofficial and unaffiliated with AlterStaff.
 [/list]
@@ -599,6 +614,49 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [size=5][color=#D291BC]■ Changelog[/color][/size]
 
 [color=#9B7EBD]All releases in full, collapsed. Each entry says what was visibly wrong, what was actually happening underneath, and what changed — the middle one is the part worth reading, because the obvious explanation was wrong more often than not.[/color]
+
+[spoiler][size=4][color=#7ACC7A]▼ 5.6.0 — "Azure voices actually reach Azure"[/color][/size]
+
+[size=3][color=#E8A5C8][b]FIXED · Azure key "did nothing", Azure "sounded robotic", per-girl Azure voices "did nothing"[/b] [font=Courier New]plugin/AzureTts.cs[/font][/color][/size]
+[list]
+[*][b]Visibly:[/b] a player enters an Azure key and saves, and she still sounds robotic. Test voice says "Works!". Per-girl Azure voices change nothing.
+[*][b]Actually:[/b] Azure Speech keys only work in their own region, and the mod defaulted to eastus. Any other key got HTTP 401. The mod then synthesised the line with the offline voice, handed it back as if Azure had spoken, and Test voice reported success because audio came back. Nothing ever reached Azure, so per-girl voices had nothing to act on. A per-girl voice the region didn't have (HTTP 400) failed the same way.
+[*][b]Now:[/b] the region box accepts the code, the display name or the endpoint URL. On a rejected key the mod asks every region at once which one owns the key, switches, saves and says so. Every synthesis records what really happened. Test voice and a one-time in-game notice report it, including "what you heard was the OFFLINE voice".
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Per-girl Azure voices[/b] [font=Courier New]plugin/Voices.cs · plugin/OverlayMenu.cs[/font][/color][/size]
+[list]
+[*]Azure has its own per-character voice boxes, separate from the Custom Endpoint ones, so an xAI or ElevenLabs name can't be misread. Azure names typed into the old shared boxes are copied over once.
+[*]Names are checked against the region's real voice list as you type. A bare name like "Jenny" is accepted. There's a voice browser (HD first) and a per-girl play button; before, Test voice could only play the default voice.
+[*]A voice the region refuses no longer costs the line. She speaks with her original voice instead, and you're told which voice was refused.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Azure voices spoke too fast[/b] [font=Courier New]plugin/GameTts.cs[/font][/color][/size]
+[list]
+[*][b]Visibly:[/b] with 5.6's speaking styles on, Azure voices ran at nearly double speed.
+[*][b]Actually:[/b] the game's voice library (read from its compiled code) turns "rate 1.3" into +15%, because it halves every speed-up. The mod's cast table had sent +30% since 5.3. 5.6's styles, which are about 15% faster on their own, then stacked on top: 1.51× natural speed, measured, against the game's 1.15×.
+[*][b]Now:[/b] the cast stores the game's raw numbers and converts them exactly as the game does, and a style replaces the speed-up instead of adding to it. Measured: 1.16×.
+[/list]
+
+[size=3][color=#E8A5C8][b]IMPROVED · Azure sounds less synthetic[/b][/color][/size]
+[list]
+[*]24 kHz output instead of 16 kHz. The voices are built at 24 kHz, and 16 kHz discarded everything above 8 kHz.
+[*]Expressive delivery (toggle, on): voices with speaking styles speak each line in one that matches her expression. Jane and Nancy from the original cast support it.
+[*]Original tuning (toggle, on): the base game raises and speeds up its cast. Turn it off to hear the same voices at their natural pitch and pace.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Original Azure voices that didn't match the game[/b][/color][/size]
+[list]
+[*]Hub girl and parrot girl use Eddie's voice (Jane), as in the base game, instead of the mod's fallback (Nancy).
+[*]Japanese Estelle and Eiona (Nanami) use the game's tuning (slightly higher, 10% slower) instead of 15% higher and 10% faster.
+[*]The ghost was shown and tested as Elysia's voice in the menu but speaks with the magic circle's voice in play, as the game does. The menu now matches.
+[*]The cast is keyed by character, so final-door and minigame versions of each girl resolve to her voice too.
+[/list]
+
+[size=3][color=#E8A5C8][b]KNOWN · The offline voice is robotic by nature[/b][/color][/size]
+[list]
+[*]It is the game's own small on-device engine, and no setting can change that. Use Azure (free tier) or a cloud provider for natural voices.
+[/list][/spoiler]
 
 [spoiler][size=4][color=#7ACC7A]▼ 5.5.0 — "Google AI Studio, Grok text, and the Prompts tab"[/color][/size]
 

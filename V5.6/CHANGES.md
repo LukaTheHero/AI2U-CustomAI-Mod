@@ -1,5 +1,115 @@
 # AI2U — Custom AI Endpoint
 
+## 5.6.0 — Azure voices actually reach Azure
+
+Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64
+
+### FIXED · "My Azure key does nothing", "Azure sounds robotic", "the per-girl Azure voices do nothing" — one bug
+
+Three separate reports, one cause. **An Azure Speech key only works in the region
+it was created in**, and the mod's region box defaulted to `eastus`. Any key made
+anywhere else was refused by Azure — and when that happened, the mod quietly
+played the line with the offline voice instead and carried on as if Azure had
+spoken. The **Test voice** button even said "Works!", because some audio did
+come back. So players with a perfectly good key heard the robotic offline voice,
+were told Azure was working, and reasonably concluded Azure sounds robotic. Every
+per-girl voice they typed changed nothing, because nothing was reaching Azure to
+carry it.
+
+Now:
+
+- **The region is found for you.** If Azure refuses your key, the mod asks every
+  Azure region at once which one the key belongs to, switches to it, saves it,
+  and tells you. The region box also accepts the code (`northcentralus`), the
+  name (`North Central US`) or the endpoint URL from the portal's Keys and
+  Endpoint page.
+- **Failures are no longer silent.** If Azure still can't speak a line, you see
+  a one-time notice at the top of the screen that says why, in plain words, and
+  that she is using the offline voice until it's fixed.
+- **Test voice tells the truth.** It now says "Works! Azure spoke it" and names
+  the voice and region, or "Azure FAILED" with the reason, adding "what you
+  just heard was the OFFLINE voice" when that's what played.
+
+### FIXED · Per-girl Azure voices
+
+- **Azure has its own voice box per character**, separate from the Custom
+  Endpoint ones, so an xAI or ElevenLabs voice name can't be misread as an Azure
+  one. Azure names you typed into the old shared boxes are copied over
+  automatically, once.
+- **Type a name any way you like.** `en-US-JennyNeural` and plain `Jenny` both
+  work. Each name is checked against the voices your region actually offers
+  as you type, so a mistake shows up in the menu, not in the middle of a scene.
+- **Browse instead of guessing.** The list button next to each character shows
+  every voice in your region, with the most natural (HD) voices first.
+- **A play button per character.** It saves, then speaks as that character, so
+  you can hear each girl's voice from the menu. Before, Test voice could only
+  ever play the default voice.
+- **A voice your region refuses no longer costs the line.** She speaks with
+  her original game voice instead of dropping to the offline one, and you're
+  told which voice was refused.
+
+### FIXED · Azure voices spoke too fast
+
+The mod has played the original Azure cast faster than the game does since
+5.3. The game's voice library halves every speed-up before it reaches Azure,
+so the game's "30% faster" for Eddie's voice is really 15%, and the mod had been
+sending the full 30%. Then 5.6's new speaking styles, which already speak about
+15% faster on their own, stacked on top of that, and she ran at about 1.5 times
+her natural speed. Measured on the same line against the real game:
+
+- 5.6 before this fix: 1.51x natural speed
+- the base game: 1.15x
+- now: 1.16x
+
+Every original voice now uses the game's own numbers, converted the way the
+game converts them. When a speaking style is in use, it replaces the speed-up
+instead of adding to it, so she keeps the game's pace and still gets the emotion.
+
+### IMPROVED · Azure voices sound less synthetic
+
+- **24 kHz audio instead of 16 kHz.** Azure's neural voices are built at 24 kHz,
+  and 16 kHz threw away everything above 8 kHz — most of the breath and
+  brightness that makes a voice sound present rather than phoned in.
+- **Expressive delivery (new toggle, on).** Voices that support Azure's
+  speaking styles now speak each line in one that matches her expression:
+  cheerful, sad, angry, frightened, shy. Jane and Nancy from the original cast
+  support this. Amber has no styles and sounds as before.
+- **Original tuning (new toggle, on).** The base game raises and speeds up its
+  voices — Eddie's Jane is 20% higher and 15% faster than the voice was built.
+  That's faithful, but it's also a big part of the robotic sound. Turn it off to
+  hear the same voices at their natural pitch and pace. Voices you pick yourself
+  always play at their natural pitch and pace.
+
+### FIXED · Original Azure voices that didn't match the game
+
+- **Hub girl and parrot girl** now use Eddie's voice (Jane), as in the base
+  game. The mod had given them Nancy, its fallback voice.
+- **Japanese Estelle and Eiona** (Nanami) now use the game's tuning, slightly
+  higher and 10% slower. The mod had them 15% higher and 10% faster.
+- **The ghost** was shown and tested as Elysia's voice in the menu, while in
+  play she speaks with the magic circle's voice, as the game does. The menu
+  now matches what you hear.
+- The final-door and minigame versions of each girl resolve to her voice
+  reliably. The old table used character numbers that don't exist in the game
+  and missed two that do.
+
+### KNOWN · The offline voice is robotic by nature
+
+"1. Local Original (Offline)" is the game's own on-device voice engine, and its
+voices are small, fast models. That's why they sound robotic, and no setting in
+the mod can change it. For natural voices, use Cloud Original (Azure) — its
+free tier covers 500,000 characters a month — or a cloud voice provider.
+
+### Azure setup, start to finish
+
+1. In the Azure portal, create a **Speech service** resource. The **Free F0**
+   tier costs nothing.
+2. Open its **Keys and Endpoint** page and copy **KEY 1** and the **Location/Region**.
+3. In game: **F9 → Voice → ○ 2. Cloud Original (Azure)**, paste the key and the
+   region, press **Save**.
+4. **Setup → Test voice** should say **"Works! Azure spoke it"**. If it says
+   "Azure FAILED", it tells you why.
+
 ## 5.5.0 — Google AI Studio, Grok text, and every prompt is now yours
 
 Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64

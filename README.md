@@ -9,7 +9,7 @@ the Nexus release remains the canonical build.
 ## Layout
 
 ```
-V5.5/                 the current release, self-contained:
+V5.6/                 the current release, self-contained:
   plugin/             C# source + build.sh
   dist/               release layout (BepInEx/plugins/…)
   installer/          the "easy installer" (Install.bat + PowerShell)
@@ -21,7 +21,7 @@ media/                gallery images used on the Nexus page
 
 **This repository only ever carries the latest version.** Older releases are not
 kept here — when a new version ships, its folder replaces the previous one. Every
-version's release notes stay readable in `V5.5/CHANGES.md`, which holds the full
+version's release notes stay readable in `V5.6/CHANGES.md`, which holds the full
 changelog back to V1, and older builds remain downloadable from the Nexus Files
 tab.
 
@@ -32,7 +32,7 @@ No Visual Studio needed. Each `plugin/build.sh` compiles with the .NET Framework
 copy of the game (edit the paths at the top of the script to match your install).
 
 ```
-cd V5.5/plugin
+cd V5.6/plugin
 ./build.sh --no-install     # compile only
 ./build.sh                  # compile + install to the game copy configured in the script
 ```

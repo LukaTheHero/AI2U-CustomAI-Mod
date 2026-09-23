@@ -64,6 +64,18 @@ namespace AI2UCustomAI
         static readonly Dictionary<string, ConfigEntry<string>> _cfg =
             new Dictionary<string, ConfigEntry<string>>();
 
+        // Azure gets its own per-character voices, separate from the ones above.
+        //
+        // Until 5.6 the Azure mode read the same per-character fields as the
+        // Custom Endpoint mode, and those hold provider-specific names: "eve" for
+        // xAI, a voice id for ElevenLabs. Azure then had to guess which values
+        // were meant for it, and the guess was "contains the word Neural", which
+        // silently ignored a typed "Jenny" and accepted names the key's region
+        // does not have. Two providers, two sets of fields: nothing typed for one
+        // can be misread by the other.
+        static readonly Dictionary<string, ConfigEntry<string>> _az =
+            new Dictionary<string, ConfigEntry<string>>();
+
         public static void Bind(ConfigFile config)
         {
             for (int i = 0; i < Names.Length; i++)
@@ -73,6 +85,105 @@ namespace AI2UCustomAI
                     + "GrokTTS section. Only the voice is per-character - the base URL, API key and "
                     + "model are shared, so this costs nothing extra and needs no second account.");
             }
+
+            for (int i = 0; i < Names.Length; i++)
+            {
+                _az[Names[i]] = config.Bind("Voice.PerCharacterAzure", Names[i], "",
+                    "Azure Speech voice for " + Labels[i] + " in Cloud Original (Azure) mode. Leave "
+                    + "empty for her original game voice. Any voice your Azure region offers works - a "
+                    + "full name like en-US-JennyNeural, or just Jenny. The HD voices "
+                    + "(...MultilingualNeuralHD) sound the most natural.");
+            }
+
+            // Once, ever. Running it on every start put back any Azure voice the
+            // player had deliberately cleared, because the old shared field still
+            // held it and the Azure field was empty again.
+            _azMigrated = config.Bind("Voice.PerCharacterAzure", "_MigratedFromShared", false,
+                "Internal: set after the one-time copy of Azure voice names from the shared "
+                + "per-character fields (5.6). Leave it alone.");
+            if (!_azMigrated.Value)
+            {
+                MigrateAzure();
+                _azMigrated.Value = true;
+            }
+        }
+
+        static ConfigEntry<bool> _azMigrated;
+
+        // Would this value, typed into a shared per-character field, have been
+        // meant for Azure? The same test the migration and old profiles use.
+        internal static bool AzureCandidate(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return false;
+            v = v.Trim();
+            return v.IndexOf("Neural", StringComparison.OrdinalIgnoreCase) >= 0 || AzureTts.LooksLikeShortName(v);
+        }
+
+        // A player who typed an Azure voice into the shared field before 5.6 did
+        // it because that was the only field there was. Carry those values over
+        // once, so nobody's setup changes under them; values that were plainly
+        // meant for another provider stay where they are.
+        static void MigrateAzure()
+        {
+            int moved = 0;
+            for (int i = 0; i < Names.Length; i++)
+            {
+                ConfigEntry<string> shared, az;
+                if (!_cfg.TryGetValue(Names[i], out shared) || !_az.TryGetValue(Names[i], out az)) continue;
+                string v = shared.Value == null ? "" : shared.Value.Trim();
+                string cur = az.Value == null ? "" : az.Value.Trim();
+                if (cur.Length > 0 || v.Length == 0) continue;
+                if (!AzureCandidate(v)) continue;
+                az.Value = v;
+                moved++;
+            }
+            if (moved > 0)
+                Plugin.Log.LogInfo("Voice: copied " + moved + " Azure voice name(s) into the new per-character "
+                    + "Azure fields.");
+        }
+
+        // The panel's name for a character, for messages the player reads.
+        internal static string LabelFor(string name)
+        {
+            for (int i = 0; i < Names.Length; i++)
+                if (Names[i] == name) return Labels[i];
+            return string.IsNullOrEmpty(name) ? "This character" : name;
+        }
+
+        public static ConfigEntry<string> AzureEntry(string name)
+        {
+            ConfigEntry<string> e;
+            return name != null && _az.TryGetValue(name, out e) ? e : null;
+        }
+
+        // The Azure voice a player set for this character, or null for "her
+        // original voice".
+        public static string AzureVoiceFor(string who)
+        {
+            ConfigEntry<string> e = AzureEntry(who);
+            if (e == null || e.Value == null) return null;
+            string v = e.Value.Trim();
+            return v.Length == 0 ? null : v;
+        }
+
+        // Which of Names a game character id belongs to - the final-doors and
+        // minigame ids resolve to the girl behind them. Null when the id is not a
+        // speaking character.
+        internal static string BaseNameForId(int? id)
+        {
+            if (!id.HasValue) return null;
+            try
+            {
+                Type t = HarmonyLib.AccessTools.TypeByName("Character");
+                if (t == null || !t.IsEnum) return null;
+                string enumName = Enum.GetName(t, id.Value);
+                if (string.IsNullOrEmpty(enumName)) return null;
+                string who = BaseName(enumName);
+                for (int i = 0; i < Names.Length; i++)
+                    if (Names[i] == who) return who;
+                return null;
+            }
+            catch (Exception) { return null; }
         }
 
         public static ConfigEntry<string> Entry(string name)

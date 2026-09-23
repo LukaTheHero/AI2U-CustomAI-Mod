@@ -17,10 +17,10 @@ using LeastSquares.Overtone;
 
 namespace AI2UCustomAI
 {
-    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.5.0")]
+    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.6.0")]
     public class Plugin : BaseUnityPlugin
     {
-        public const string VERSION = "5.5.0";
+        public const string VERSION = "5.6.0";
 
         // The old URL was a placeholder twice over: the repository did not exist
         // AND the account name was wrong, so it could never have resolved. It
@@ -98,6 +98,8 @@ namespace AI2UCustomAI
         public static ConfigEntry<bool> CfgGameVoice;
         public static ConfigEntry<string> CfgGameVoiceKey;
         public static ConfigEntry<string> CfgGameVoiceRegion;
+        public static ConfigEntry<bool> CfgAzureExpressive;
+        public static ConfigEntry<bool> CfgAzureOriginalTuning;
         public static ConfigEntry<bool> CfgGrokEnabled;
         public static ConfigEntry<string> CfgGrokBaseUrl;
         public static ConfigEntry<string> CfgGrokApiKey;
@@ -200,7 +202,22 @@ namespace AI2UCustomAI
             CfgGameVoiceKey = Config.Bind("GameVoice", "AzureSpeechKey", "",
                 "Azure Speech API key for Cloud Original voice mode.");
             CfgGameVoiceRegion = Config.Bind("GameVoice", "AzureSpeechRegion", "eastus",
-                "Azure Speech region (e.g. eastus, westeurope) for Cloud Original voice mode.");
+                "Azure Speech region for Cloud Original voice mode - the region your Speech resource "
+                + "was created in (e.g. northcentralus, eastus, westeurope). An Azure key only works in "
+                + "its own region. The display name (North Central US) or the endpoint URL from the "
+                + "portal's Keys and Endpoint page work too, and if the key is rejected the mod finds "
+                + "the right region itself and saves it here.");
+            CfgAzureExpressive = Config.Bind("GameVoice", "AzureExpressiveDelivery", true,
+                "Let Azure voices speak each line in a style that matches her current expression - "
+                + "cheerful, sad, angry, frightened, shy - on voices that support speaking styles "
+                + "(Jane and Nancy from the original cast do; Amber has none and is unaffected). "
+                + "Off: every line in the voice's default register.");
+            CfgAzureOriginalTuning = Config.Bind("GameVoice", "AzureOriginalTuning", true,
+                "Keep the base game's pitch and speed settings for the original Azure cast (Eddie's "
+                + "Jane is raised 20% and sped up 15%, for example). Faithful to the game, but a large "
+                + "part of what makes those voices sound synthetic. Off: the same voices at their "
+                + "natural pitch and pace. Voices you choose per character always use their natural "
+                + "pitch and pace.");
             CfgSpeakActions = Config.Bind("Voice", "SpeakActions", false,
                 "Read stage directions out loud. Models in character write actions inline, like "
                 + "\"*grabs the controller* almost got it\". Off - the default - speaks only the words "
@@ -947,6 +964,15 @@ namespace AI2UCustomAI
 
         static string _toast;
         static float _toastUntil;
+
+        // The same top-of-screen notice the F8 toggle uses, for anything that
+        // must be seen during play rather than found in the log later.
+        internal static void Toast(string message, float seconds)
+        {
+            if (string.IsNullOrEmpty(message)) return;
+            _toast = message;
+            _toastUntil = Time.realtimeSinceStartup + (seconds > 0f ? seconds : 3f);
+        }
         static Texture2D _toastBg;
 
         static Texture2D SolidTexture(Color c)
@@ -984,8 +1010,24 @@ namespace AI2UCustomAI
             style.normal.background = _toastBg;
             style.padding = new RectOffset(20, 20, 12, 12);
 
-            Vector2 size = style.CalcSize(new GUIContent(_toast));
-            float w = size.x + 40f, h = size.y + 24f;
+            // Short notices size to their text; long ones (the Azure voice notices
+            // are a sentence or two) wrap inside a capped width instead of running
+            // off both edges of the screen.
+            GUIContent content = new GUIContent(_toast);
+            Vector2 size = style.CalcSize(content);
+            float maxW = Mathf.Min(Screen.width - 80f, 900f);
+            float w, h;
+            if (size.x + 40f <= maxW)
+            {
+                w = size.x + 40f;
+                h = size.y + 24f;
+            }
+            else
+            {
+                style.wordWrap = true;
+                w = maxW;
+                h = style.CalcHeight(content, w) + 24f;
+            }
             Rect r = new Rect((Screen.width - w) / 2f, 40f, w, h);
 
             GUI.DrawTexture(r, _toastBg);
@@ -3113,6 +3155,11 @@ namespace AI2UCustomAI
                 // would have discarded without a word - chiefly names over its
                 // 20-character limit.
                 Items.Repair(reactions);
+
+                // Her expression and anger for this reply, for the Azure voice to
+                // speak the line in. Recorded here because this is the reply that
+                // is about to be spoken.
+                AzureTts.NoteMood(reactions);
 
                 // Before the envelope reaches the game on purpose: if her
                 // decision loop is found parked (the hill freeze - see

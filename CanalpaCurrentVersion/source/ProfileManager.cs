@@ -105,6 +105,16 @@ namespace AI2UCustomAI
                         if (entry != null) vObj[Voices.Names[i]] = entry.Value ?? "";
                     }
                     root["character_voices"] = vObj;
+
+                    // Azure's own per-character voices (5.6), kept apart from the
+                    // Custom Endpoint ones above for the reason given in Voices.cs.
+                    JObject azObj = new JObject();
+                    for (int i = 0; i < Voices.Names.Length; i++)
+                    {
+                        var az = Voices.AzureEntry(Voices.Names[i]);
+                        if (az != null) azObj[Voices.Names[i]] = az.Value ?? "";
+                    }
+                    root["azure_character_voices"] = azObj;
                 }
 
                 // Ints
@@ -142,6 +152,8 @@ namespace AI2UCustomAI
                 if (Plugin.CfgCustomFavorability != null) bools["CustomFavorability"] = Plugin.CfgCustomFavorability.Value;
                 if (Plugin.CfgForceLocalVoice != null) bools["ForceLocalVoice"] = Plugin.CfgForceLocalVoice.Value;
                 if (Plugin.CfgGameVoice != null) bools["GameVoice"] = Plugin.CfgGameVoice.Value;
+                if (Plugin.CfgAzureExpressive != null) bools["AzureExpressive"] = Plugin.CfgAzureExpressive.Value;
+                if (Plugin.CfgAzureOriginalTuning != null) bools["AzureOriginalTuning"] = Plugin.CfgAzureOriginalTuning.Value;
                 if (Plugin.CfgGrokEnabled != null) bools["GrokEnabled"] = Plugin.CfgGrokEnabled.Value;
                 if (Plugin.CfgGrokNormalize != null) bools["GrokNormalize"] = Plugin.CfgGrokNormalize.Value;
                 if (Plugin.CfgTtsNormalize != null) bools["TtsNormalize"] = Plugin.CfgTtsNormalize.Value;
@@ -213,6 +225,37 @@ namespace AI2UCustomAI
                     }
                 }
 
+                // Older profiles have no Azure section; leaving the fields alone is the
+                // right reading of "this profile never set them".
+                JObject azObj = root["azure_character_voices"] as JObject;
+                if (azObj != null && Voices.Names != null)
+                {
+                    for (int i = 0; i < Voices.Names.Length; i++)
+                    {
+                        string cName = Voices.Names[i];
+                        if (azObj[cName] == null) continue;
+                        var az = Voices.AzureEntry(cName);
+                        if (az != null) az.Value = (string)azObj[cName];
+                    }
+                }
+                else if (Voices.Names != null)
+                {
+                    // A profile saved before 5.6 has no Azure section. Leaving the
+                    // fields alone meant it kept the PREVIOUS profile's Azure voices,
+                    // and the next save wrote them into this profile for good. Its
+                    // own shared voices are the only evidence of what it wanted, so
+                    // they are read the way the one-time migration reads them.
+                    JObject shared = root["character_voices"] as JObject;
+                    for (int i = 0; i < Voices.Names.Length; i++)
+                    {
+                        var az = Voices.AzureEntry(Voices.Names[i]);
+                        if (az == null) continue;
+                        string v = shared != null && shared[Voices.Names[i]] != null
+                            ? ((string)shared[Voices.Names[i]] ?? "").Trim() : "";
+                        az.Value = Voices.AzureCandidate(v) ? v : "";
+                    }
+                }
+
                 JObject ints = root["ints"] as JObject;
                 if (ints != null)
                 {
@@ -256,6 +299,8 @@ namespace AI2UCustomAI
                     if (bools["CustomFavorability"] != null && Plugin.CfgCustomFavorability != null) Plugin.CfgCustomFavorability.Value = (bool)bools["CustomFavorability"];
                     if (bools["ForceLocalVoice"] != null && Plugin.CfgForceLocalVoice != null) Plugin.CfgForceLocalVoice.Value = (bool)bools["ForceLocalVoice"];
                     if (bools["GameVoice"] != null && Plugin.CfgGameVoice != null) Plugin.CfgGameVoice.Value = (bool)bools["GameVoice"];
+                    if (bools["AzureExpressive"] != null && Plugin.CfgAzureExpressive != null) Plugin.CfgAzureExpressive.Value = (bool)bools["AzureExpressive"];
+                    if (bools["AzureOriginalTuning"] != null && Plugin.CfgAzureOriginalTuning != null) Plugin.CfgAzureOriginalTuning.Value = (bool)bools["AzureOriginalTuning"];
                     if (bools["GrokEnabled"] != null && Plugin.CfgGrokEnabled != null) Plugin.CfgGrokEnabled.Value = (bool)bools["GrokEnabled"];
                     if (bools["GrokNormalize"] != null && Plugin.CfgGrokNormalize != null) Plugin.CfgGrokNormalize.Value = (bool)bools["GrokNormalize"];
                     if (bools["TtsNormalize"] != null && Plugin.CfgTtsNormalize != null) Plugin.CfgTtsNormalize.Value = (bool)bools["TtsNormalize"];

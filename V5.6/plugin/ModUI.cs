@@ -367,7 +367,15 @@ namespace AI2UCustomAI
                     {
                         _vTest.onClick.RemoveAllListeners();
                         _vTest.interactable = true;
-                        _vTest.onClick.AddListener(delegate { page.StartCoroutine(RunVoiceTest(null)); });
+                        // On the mod's persistent host, not the page: the test can
+                        // run for seconds (a region search, a voice-list fetch), and
+                        // pressing Back stops a coroutine hosted by the page midway.
+                        _vTest.onClick.AddListener(delegate
+                        {
+                            MonoBehaviour h = HotkeyWatcher.Host;
+                            if (h == null) h = page;
+                            h.StartCoroutine(RunVoiceTest(null));
+                        });
                     }
                     SetVoiceLabel("Test Voice", Color.white);
                 }
@@ -456,13 +464,53 @@ namespace AI2UCustomAI
                 yield break;
             }
 
+            // Azure is tested through its own path so the outcome can be read. The
+            // generic path hands back a clip even when Azure failed - the offline
+            // voice, substituted - and this test then said "Works!" over a robotic
+            // voice, which is how three players concluded Azure itself sounds robotic.
+            bool azure = gameVoice && Plugin.CfgVoiceChoice != null
+                && string.Equals(Plugin.CfgVoiceChoice.Value, "azure", StringComparison.OrdinalIgnoreCase);
+
             AudioClip clip = null;
-            IEnumerator call = gameVoice
+            // Its own outcome: a reply spoken while this test runs must not be able
+            // to write "Works!" into it.
+            AzureOutcome outcome = new AzureOutcome();
+            IEnumerator call = azure
+                ? GameTts.SynthesizeAzureCloud("Hey. This is how I will sound.",
+                    delegate(AudioClip c) { clip = c; }, null, true, outcome)
+                : gameVoice
                 ? GameTts.Synthesize("Hey. This is how I will sound.",
                     delegate(AudioClip c) { clip = c; })
                 : GrokTts.Synthesize("Hey. This is how I will sound.",
                     delegate(AudioClip c) { clip = c; });
             while (call.MoveNext()) yield return call.Current;
+
+            if (azure)
+            {
+                if (clip != null)
+                {
+                    AudioSource asrc = UnityEngine.Object.FindObjectOfType<AudioSource>();
+                    if (asrc != null) asrc.PlayOneShot(clip);
+                }
+
+                if (outcome.Ok)
+                {
+                    ReportVoice(report, "Works! Azure spoke it (" + outcome.Voice + ", " + outcome.Region + ")"
+                        + (outcome.Note != null ? ". " + outcome.Note : ""),
+                        outcome.Note != null ? new Color(1f, 0.85f, 0.4f) : Color.green);
+                    Plugin.Log.LogInfo("Voice test succeeded: Azure " + outcome.Voice + " in " + outcome.Region + ".");
+                }
+                else
+                {
+                    ReportVoice(report, "Azure FAILED - " + (outcome.Problem ?? "no audio came back.")
+                        + (clip != null ? " What you just heard was the OFFLINE voice, not Azure." : ""),
+                        Color.red);
+                    Plugin.Log.LogWarning("Voice test: Azure failed - " + outcome.Problem);
+                }
+
+                if (_vTest != null) _vTest.interactable = true;
+                yield break;
+            }
 
             if (clip == null)
             {

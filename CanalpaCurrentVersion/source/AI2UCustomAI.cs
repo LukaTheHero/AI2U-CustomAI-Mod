@@ -17,10 +17,10 @@ using LeastSquares.Overtone;
 
 namespace AI2UCustomAI
 {
-    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.6.0")]
+    [BepInPlugin("canak.ai2u.customai", "AI2U Custom AI Endpoint", "5.7.0")]
     public class Plugin : BaseUnityPlugin
     {
-        public const string VERSION = "5.6.0";
+        public const string VERSION = "5.7.0";
 
         // The old URL was a placeholder twice over: the repository did not exist
         // AND the account name was wrong, so it could never have resolved. It

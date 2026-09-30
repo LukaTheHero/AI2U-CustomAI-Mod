@@ -1,10 +1,10 @@
-[center][size=4][b][color=#7ACC7A]My Discord server: [url=https://discord.gg/canalpa]discord.gg/canalpa[/url] — come hang out![/color][/b][/size]
+[center][size=4][b][color=#7ACC7A]My Discord server: [url=https://discord.gg/canalpa]discord.gg/canalpa[/url] — come hang out! (I can also share source files with fellow Devs that want to fork)[/color][/b][/size]
 
 [size=4][color=#9B7EBD]I've got an AI bot running on [b]GPT-5.6[/b] that provides free mod installation help to everyone in my public Discord server — if you need any help, you can get it for free by asking my bot in the [font=Courier New]magic-support[/font] channel! <3[/color][/size]
 
-[size=4][color=#E8A5C8][b]Support Canalpa[/b] — every dollar I make this way goes into mod development.[/color][/size]
+[size=4][color=#E8A5C8][b][url=https://ko-fi.com/lukathehero]Support Canalpa[/url][/b] — every dollar I make this way goes into mod development.[/color][/size]
 
-[size=5][b][color=#FF4444]OUT OF RESPECT TO ALTERSTAFF TEAM, THIS MOD WILL NEVER ALLOW MODIFICATIONS + MORE CONTEXT USING THEIR SERVERS. ONLY WITH YOUR OWN KEY![/color][/b][/size][/center]
+[size=4][b][color=#ff0000]OUT OF RESPECT TO ALTERSTAFF TEAM, THIS MOD WILL NEVER ALLOW MODIFICATIONS + MORE CONTEXT USING THEIR SERVERS. ONLY WITH YOUR OWN KEY![/color][/b][/size][/center]
 
 [line]
 
@@ -46,6 +46,21 @@ Bug reports and "it broke on version X" posts are genuinely welcome.[/color][/si
 [size=4][color=#E8A5C8]Earlier versions of this page described a mod that changed [i]where[/i] her dialogue was generated and little else. That is no longer what this is, and letting you find that out after installing would waste your time.[/color][/size]
 
 [size=4][color=#9B7EBD]With 4.4 installed you are playing a [b]meaningfully different edition[/b] of AI2U. She thinks on a different architecture, remembers on different rules, and is handed a body of context the stock game never gave her. Many core behaviours differ. If what you want is vanilla-with-your-own-key and nothing else, [b]that mod does not exist[/b] — I spent four major versions trying to build it, and the reason it cannot exist is the whole story of this release.[/color][/size][/center]
+
+[line]
+
+[size=5][color=#D291BC]■ New in 5.7 — a real Azure voice browser, plus pitch and speed[/color][/size]
+
+[size=4][color=#9B7EBD]Azure has hundreds of voices, and picking one meant guessing names. Not anymore.[/color][/size]
+
+[list]
+[*][b]Search and filter every voice.[/b] Press [b]⋯[/b] next to any character on the Voice tab. Search by name, language, mood or "HD" ([font=Courier New]ava[/font], [font=Courier New]japanese[/font], [font=Courier New]cheerful[/font]), pick a language from the list, filter Female / Male, or show HD voices only. Voices are listed like other voice apps list them: [font=Courier New]Ava Multilingual - en-US - Female[/font].
+[*][b]Hear before you choose.[/b] Every voice in the list has a ▶ that plays a sample as that character. Click a voice and it's hers, saved at once.
+[*][b]Pitch and speed per character.[/b] Two sliders in the same panel. "Default" keeps the original game's tuning for her own voice, or the natural pitch and pace of a voice you chose.
+[*][b]Typing a voice in works the way you'd expect.[/b] Lines copied from another app's list ([font=Courier New]Aria - en-US - Female[/font], [font=Courier New]Aria (en-US)[/font]) are understood, a typed name says "Not saved yet" until you save it, and the voice list loads as soon as you open the tab.
+[*][b]The Easy Installer asks before it installs.[/b] With more than one copy of the game (Steam plus an itch or copied folder, or two Steam libraries) it could put the mod in the copy you don't play. It now lists every copy it finds with what's in each and when it last ran with mods, picks the one that last ran with mods, and waits for you to confirm the folder — or pick another copy, browse for one, or paste a path.
+[*][b]Fixes.[/b] The old list button showed only her current voice once she had one. Typing a name or searching could throw a Unity GUI error. The endpoint address newer Azure resources show ([font=Courier New]https://YOUR-RESOURCE.cognitiveservices.azure.com/[/font]) now works in the region box, and a key saved on the game's own settings page is still found after a restart.
+[/list]
 
 [line]
 
@@ -365,6 +380,11 @@ This is what I actually run. It sounds great and it is the cheaper of the two.
 
 [size=5][color=#D291BC]■ Installation[/color][/size]
 
+[size=4][color=#7ACC7A]The easy way: the Easy Installer[/color][/size]
+Download the [b]Easy Installer[/b] file, extract the [b]whole[/b] zip (don't run it from inside the zip window), and double-click [font=Courier New]Install.bat[/font]. It lists every copy of the game on your PC, picks the one that last ran with mods, and waits for you to confirm the folder — press Enter to install there, type another copy's number, press [b]B[/b] to browse for a folder, or paste a folder path. It sets up BepInEx 5 if you don't have it, installs the mod, and checks everything landed. Then start the game and press [b]F9[/b]. Play more than one copy? Run it once for each.
+
+[size=4][color=#9B7EBD]The manual way[/color][/size]
+
 [size=4][color=#9B7EBD]1. Install BepInEx 5 (x64)[/color][/size]
 Download from [url=https://github.com/BepInEx/BepInEx/releases]github.com/BepInEx/BepInEx/releases[/url] — you want the file named like [font=Courier New]BepInEx_x64_5.4.23.2.zip[/font].
 
@@ -446,6 +466,7 @@ Models I have run successfully:
 [size=4][color=#9B7EBD]A voice for each of them[/color][/size]
 [i]New in 3.1.0.[/i] The [b]Voice per character[/b] rows in F9 give every girl her own voice ID, on whichever provider you use. Leave a row empty and she uses the general voice above. Only the voice is per-character — the base URL, API key and model stay shared, so this costs nothing extra and needs no second account. A voice set there follows that character wherever she appears.
 [i]New in 5.6:[/i] in [b]Cloud Original (Azure)[/b] mode the rows are Azure's own. Leave one empty for her original game voice, type any voice your region offers (a full name or just [font=Courier New]Jenny[/font]), or press the list button to browse them, HD voices first. The play button next to each girl saves the settings and speaks as her.
+[i]New in 5.7:[/i] the list button opens a full browser — search, language list, Female / Male and HD-only filters, a ▶ preview on every voice — and each girl gets her own pitch and speed sliders.
 
 [size=4][color=#9B7EBD]ElevenLabs on a free account[/color][/size]
 Voice [b]Library[/b] voices need a [b]paid[/b] ElevenLabs plan when used via the API. On the free tier they return [font=Courier New]402[/font] and the Test button says [b]"Paid plan"[/b] — that is a billing limit, not a broken mod.
@@ -614,6 +635,41 @@ That is a [b]ceiling, not a reservation[/b] — cost only grows as the history a
 [size=5][color=#D291BC]■ Changelog[/color][/size]
 
 [color=#9B7EBD]All releases in full, collapsed. Each entry says what was visibly wrong, what was actually happening underneath, and what changed — the middle one is the part worth reading, because the obvious explanation was wrong more often than not.[/color]
+
+[spoiler][size=4][color=#7ACC7A]▼ 5.7.0 — "Azure voice browser, filters, pitch and speed"[/color][/size]
+
+[size=3][color=#E8A5C8][b]NEW · Voice browser[/b] [font=Courier New]plugin/OverlayMenu.cs · plugin/AzureTts.cs[/font][/color][/size]
+[list]
+[*]Search by name, language, mood or "HD"; a language list; Female / Male and HD-only filters; voices listed as "Name - locale - gender".
+[*]A ▶ preview on every voice, spoken as that character. Clicking a voice gives it to her and saves at once.
+[/list]
+
+[size=3][color=#E8A5C8][b]NEW · Pitch and speed per character[/b] [font=Courier New]plugin/Voices.cs · plugin/GameTts.cs[/font][/color][/size]
+[list]
+[*]Two sliders per character, saved as you move them, kept in profiles. Dragon HD voices ignore pitch and speed (Azure's limit).
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Typing a voice in, and the list button[/b] [font=Courier New]plugin/AzureTts.cs · plugin/OverlayMenu.cs[/font][/color][/size]
+[list]
+[*]Names copied from other voice apps now resolve: "Aria - en-US - Female", "Aria (en-US)", "en-US Aria", "nova hd".
+[*]A typed name says "Not saved yet" until Save; the voice list loads when the tab opens and waits longer on slow connections.
+[*]The old list filtered by her voice box, so it showed only her current voice, or nothing. It has its own search now.
+[*]Typing a name or searching could throw a Unity GUI error ("Mismatched LayoutGroup") and skip part of the panel.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Easy installer picked the wrong copy[/b] [font=Courier New]installer/installer.ps1[/font][/color][/size]
+[list]
+[*]Lists every copy of the game it finds (Steam libraries, itch, AI2U folders on any drive) with BepInEx/mod status and when each last ran with mods.
+[*]Preselects the copy that last ran with mods and waits for you to confirm the folder: Enter, a number for another copy, B to browse, or paste a path.
+[/list]
+
+[size=3][color=#E8A5C8][b]FIXED · Azure setup[/b] [font=Courier New]plugin/AzureTts.cs · plugin/GameTts.cs[/font][/color][/size]
+[list]
+[*]The per-resource endpoint newer Azure resources show ([font=Courier New]https://YOUR-RESOURCE.cognitiveservices.azure.com/[/font]) works in the region box.
+[*]A key saved on the game's own settings page is still found after a restart.
+[*]If Azure refuses a mood or a pitch/speed for a chosen voice, only that part is dropped; before, she lost the chosen voice for that line.
+[/list]
+[/spoiler]
 
 [spoiler][size=4][color=#7ACC7A]▼ 5.6.0 — "Azure voices actually reach Azure"[/color][/size]
 

@@ -725,6 +725,10 @@ namespace AI2UCustomAI
 
         static void DrawWindow(int id)
         {
+            // Clicks the Voice tab queued in the previous event take effect here,
+            // before this event lays anything out (see _azLater).
+            if (LayoutPass) RunQueuedClicks();
+
             // The default skin's window and box styles have no background texture
             // in a built player, so the panel paints its own.
             GUI.DrawTexture(new Rect(0f, 0f, _win.width, _win.height), _panelBg);
@@ -2229,9 +2233,58 @@ namespace AI2UCustomAI
         // needed to know. Everything below reads what actually happened.
         static string _azPick;
         static Vector2 _azPickScroll;
+        static Vector2 _azLangScroll;
         static bool _azBusy;
         static readonly Dictionary<string, string> _azResult = new Dictionary<string, string>();
         static readonly Dictionary<string, Color> _azResultColor = new Dictionary<string, Color>();
+
+        // The voice browser's own filters (5.7). They belong to the browser, not
+        // to a character, so they stay as they are while the player moves from
+        // one girl to the next.
+        static string _azSearch = "";
+        static string _azLang = "";
+        static bool _azLangOpen;
+        static int _azGender;
+        static bool _azHdOnly;
+        static readonly string[] GenderNames = { "Any", "Female", "Male" };
+
+        // IMGUI runs every event twice - a Layout pass, then the event itself -
+        // and both passes must draw the same controls. A click or a keystroke
+        // lands in the second pass, so anything it changes that adds or removes
+        // a control (a hint line, a longer voice list, an opened panel) must not
+        // show until the next Layout. 5.6 changed them on the spot: typing the
+        // first letter of a voice name made its hint line appear mid-event,
+        // widening the list with Backspace grew it mid-event, and Unity throws
+        // "GUILayout: Mismatched LayoutGroup" part-way through the panel when
+        // that happens - an error in the log, and a panel that skips the rest
+        // of that event, right while a player is typing a voice or searching.
+        //
+        // So on this section a click only queues what it does, and the queue runs
+        // at the start of the next Layout pass (DrawWindow); and whatever depends
+        // on typed text is worked out in the Layout pass and reused by the event.
+        static readonly List<Action> _azLater = new List<Action>();
+
+        static void AzLater(Action a)
+        {
+            if (a != null) _azLater.Add(a);
+        }
+
+        static bool LayoutPass
+        {
+            get { Event e = Event.current; return e != null && e.type == EventType.Layout; }
+        }
+
+        internal static void RunQueuedClicks()
+        {
+            if (_azLater.Count == 0) return;
+            Action[] run = _azLater.ToArray();
+            _azLater.Clear();
+            for (int i = 0; i < run.Length; i++)
+            {
+                try { run[i](); }
+                catch (Exception ex) { Plugin.Log.LogError("Voice tab: a queued action failed: " + ex); }
+            }
+        }
 
         // Unsaved edits first, so the voice browser works on what is in the boxes
         // without saving the whole panel behind the player's back; then whatever
@@ -2246,10 +2299,7 @@ namespace AI2UCustomAI
         {
             string r = AzureTts.NormalizeRegion(Get("GameVoiceRegion"));
             if (r.Length == 0 && Plugin.CfgGameVoiceRegion != null) r = AzureTts.NormalizeRegion(Plugin.CfgGameVoiceRegion.Value);
-            if (r.Length == 0)
-            {
-                try { r = AzureTts.NormalizeRegion(Communicator.APIKey_UserPersonalTTS_Region); } catch (Exception) { }
-            }
+            if (r.Length == 0) r = AzureTts.GameMenuRegion();
             return r.Length > 0 ? r : "eastus";
         }
 
@@ -2283,43 +2333,139 @@ namespace AI2UCustomAI
             return resolved;
         }
 
+        // Worked out in the Layout pass: the key box is drawn above this, and
+        // emptying or filling it mid-keystroke switched between one line and two.
+        static string _azStatus, _azStatusNote;
+        static Color _azStatusColor = Color.white;
+
         static void AzureStatus()
         {
+            if (LayoutPass || _azStatus == null)
+            {
+                _azStatusNote = null;
+                _azStatusColor = GUI.skin.label.normal.textColor;
+                if (AzureKeyNow().Length == 0)
+                {
+                    _azStatusColor = new Color(1f, 0.72f, 0.25f);
+                    _azStatus = "  Status: selected, but there is no Azure key yet - press the button above to "
+                        + "make a free one, paste it in, and Save.";
+                }
+                else
+                {
+                    if (AzureTts.LastOk)
+                    {
+                        _azStatusColor = Color.green;
+                        _azStatus = "  Last line: spoken by Azure - " + AzureTts.LastVoice
+                            + (AzureTts.LastStyle != null ? " (" + AzureTts.LastStyle + ")" : "")
+                            + " in " + AzureTts.LastRegion + ".";
+                    }
+                    else if (AzureTts.LastFellBack && AzureTts.LastProblem != null)
+                    {
+                        _azStatusColor = new Color(1f, 0.35f, 0.35f);
+                        _azStatus = "  Last line: Azure FAILED - " + AzureTts.LastProblem
+                            + " She spoke it with the offline voice instead.";
+                    }
+                    else
+                        _azStatus = "  Status: ready. Press Test voice on the Setup tab, or the play button next "
+                            + "to any character below, to hear Azure and confirm it works.";
+                    if (AzureTts.LastNote != null) _azStatusNote = "  Note: " + AzureTts.LastNote;
+                }
+            }
+
             GUIStyle st = new GUIStyle(GUI.skin.label);
             st.wordWrap = true;
-
-            if (AzureKeyNow().Length == 0)
-            {
-                st.normal.textColor = new Color(1f, 0.72f, 0.25f);
-                GUILayout.Label("  Status: selected, but there is no Azure key yet - press the button above to "
-                    + "make a free one, paste it in, and Save.", st);
-                return;
-            }
-
-            if (AzureTts.LastOk)
-            {
-                st.normal.textColor = Color.green;
-                GUILayout.Label("  Last line: spoken by Azure - " + AzureTts.LastVoice
-                    + (AzureTts.LastStyle != null ? " (" + AzureTts.LastStyle + ")" : "")
-                    + " in " + AzureTts.LastRegion + ".", st);
-            }
-            else if (AzureTts.LastFellBack && AzureTts.LastProblem != null)
-            {
-                st.normal.textColor = new Color(1f, 0.35f, 0.35f);
-                GUILayout.Label("  Last line: Azure FAILED - " + AzureTts.LastProblem
-                    + " She spoke it with the offline voice instead.", st);
-            }
-            else
-            {
-                GUILayout.Label("  Status: ready. Press Test voice on the Setup tab, or the play button next "
-                    + "to any character below, to hear Azure and confirm it works.", st);
-            }
-
-            if (AzureTts.LastNote != null)
+            st.normal.textColor = _azStatusColor;
+            GUILayout.Label(_azStatus, st);
+            if (_azStatusNote != null)
             {
                 st.normal.textColor = new Color(1f, 0.85f, 0.4f);
-                GUILayout.Label("  Note: " + AzureTts.LastNote, st);
+                GUILayout.Label(_azStatusNote, st);
             }
+        }
+
+        // One character's row, worked out in the Layout pass (see _azLater).
+        sealed class AzRow
+        {
+            public string Hint;
+            public Color HintColor;
+            public string Tuning;
+            public string Result;
+            public Color ResultColor;
+            public bool Open;
+        }
+
+        static readonly Dictionary<string, AzRow> _azRows = new Dictionary<string, AzRow>();
+
+        static readonly Color AzRed = new Color(1f, 0.45f, 0.45f);
+        static readonly Color AzBlue = new Color(0.7f, 0.85f, 1f);
+        static readonly Color AzAmber = new Color(1f, 0.85f, 0.4f);
+        static readonly Color AzGrey = new Color(0.62f, 0.66f, 0.72f);
+
+        static AzRow RowFor(string name)
+        {
+            AzRow r;
+            if (!_azRows.TryGetValue(name, out r))
+            {
+                r = new AzRow();
+                _azRows[name] = r;
+            }
+            return r;
+        }
+
+        static string SavedAzureVoice(string name)
+        {
+            ConfigEntry<string> e = Voices.AzureEntry(name);
+            return e != null && e.Value != null ? e.Value.Trim() : "";
+        }
+
+        static void ComputeRow(AzRow r, string name, string bufKey, string region, List<AzureVoice> cat)
+        {
+            string typed = Get(bufKey).Trim();
+            r.Hint = null;
+            r.HintColor = AzBlue;
+
+            // Checked as it is typed, against the region's own list, so a name the
+            // region does not have is caught here rather than in play.
+            if (typed.Length > 0)
+            {
+                if (cat == null && AzureTts.CatalogBusy(region))
+                {
+                    r.Hint = "checking the name against the voice list...";
+                    r.HintColor = AzGrey;
+                }
+                else
+                {
+                    string problem;
+                    string resolved = CachedResolve(bufKey, typed, region, cat, out problem);
+                    if (resolved == null)
+                    {
+                        r.Hint = problem + " Her original voice will be used.";
+                        r.HintColor = AzRed;
+                    }
+                    else if (!string.Equals(resolved, typed, StringComparison.OrdinalIgnoreCase))
+                        r.Hint = "reads as " + resolved;
+                }
+            }
+
+            // A typed name did nothing until Save, and nothing said so; the voice
+            // list's own picks are saved at once.
+            if (typed != SavedAzureVoice(name))
+            {
+                r.Hint = (r.Hint != null ? r.Hint + "   " : "") + "Not saved yet - press Save, or the play button.";
+                if (r.HintColor != AzRed) r.HintColor = AzAmber;
+            }
+
+            int? p = Voices.AzurePitchFor(name), s = Voices.AzureSpeedFor(name);
+            r.Tuning = p.HasValue || s.HasValue
+                ? "pitch " + (p.HasValue ? AzureTts.Percent(p.Value) : "default")
+                    + "   ·   speed " + (s.HasValue ? AzureTts.Percent(s.Value) : "default")
+                : null;
+
+            string res;
+            r.Result = _azResult.TryGetValue(name, out res) ? res : null;
+            Color rc;
+            r.ResultColor = _azResultColor.TryGetValue(name, out rc) ? rc : Color.white;
+            r.Open = _azPick == name;
         }
 
         static void AzureCharacterVoices()
@@ -2327,12 +2473,26 @@ namespace AI2UCustomAI
             GUILayout.Space(8f);
             Header("Azure voice per character");
             PlainNote("  Empty means her ORIGINAL game voice (shown in grey). Type any voice your region "
-                + "offers - a full name like en-US-JennyNeural, or just Jenny - or press the list button "
-                + "to browse them. The play button saves, then speaks as that character. HD voices sound "
-                + "the most natural.");
+                + "offers - en-US-JennyNeural, just Jenny, or a line copied from another app like "
+                + "\"Aria - en-US - Female\" - or press ⋯ to browse them all with search and filters, "
+                + "set her pitch and speed, and preview voices. The play button saves, then speaks as "
+                + "that character. HD voices sound the most natural.");
 
-            string region = AzureRegionNow();
-            List<AzureVoice> cat = AzureTts.Catalog(region);
+            // The region box is drawn above this section, so a keystroke there
+            // changes the region mid-event. What the section is drawn against -
+            // region, catalogue, language list - is fixed in the Layout pass and
+            // reused by the event, or a half-typed region would draw a different
+            // browser in the second pass than the first.
+            bool layout = LayoutPass;
+            if (layout || _azFrameRegion == null)
+            {
+                _azFrameRegion = AzureRegionNow();
+                _azFrameCat = AzureTts.Catalog(_azFrameRegion);
+                _azFrameLocs = AzureTts.Locales(_azFrameRegion);
+                if (layout && _azFrameCat == null) AutoLoadCatalog(_azFrameRegion);
+            }
+            string region = _azFrameRegion;
+            List<AzureVoice> cat = _azFrameCat;
             int lang = LangIdx();
 
             GUIStyle hint = new GUIStyle(GUI.skin.label);
@@ -2344,114 +2504,306 @@ namespace AI2UCustomAI
                 string name = Voices.Names[i];
                 string bufKey = AzVoicePrefix + name;
                 AzureVoiceSpec def = GameTts.DefaultCast(name, name == "MagicCircle" || name == "Ghost", lang);
-                // Read before the buttons: a click that opens or closes the list
-                // changes _azPick mid-event, and drawing the list in the same event
-                // would add controls its layout pass never saw.
-                bool pickerOpen = _azPick == name;
+                AzRow row = RowFor(name);
+                if (layout) ComputeRow(row, name, bufKey, region, cat);
 
                 GUILayout.BeginHorizontal();
                 Label(Voices.Labels[i]);
                 string next = TextFieldWithPlaceholder(Get(bufKey), "original: " + def.VoiceName, 270f, true);
                 _buf[bufKey] = next;
-                bool play = GUILayout.Button(_azBusy || _busyVoice ? "..." : "\u25B6", GUILayout.Width(32f));
-                bool pick = GUILayout.Button(_azPick == name ? "\u25B2" : "\u22EF", GUILayout.Width(32f));
+                if (GUILayout.Button(_azBusy || _busyVoice ? "..." : "▶", GUILayout.Width(32f))
+                    && !_azBusy && !_busyVoice)
+                    AzLater(delegate { StartAzureCharacterTest(name, null); });
+                if (GUILayout.Button(row.Open ? "▲" : "⋯", GUILayout.Width(32f)))
+                    AzLater(delegate { ToggleBrowser(name); });
                 GUILayout.EndHorizontal();
 
-                // Checked as it is typed, against the region's own list, so a name
-                // the region does not have is caught here rather than in play.
-                string typed = next.Trim();
-                if (cat != null && typed.Length > 0)
+                if (row.Hint != null)
                 {
-                    string problem;
-                    string resolved = CachedResolve(bufKey, typed, region, cat, out problem);
-                    if (resolved == null)
-                    {
-                        hint.normal.textColor = new Color(1f, 0.45f, 0.45f);
-                        GUILayout.Label("      " + problem + " Her original voice will be used.", hint);
-                    }
-                    else if (!string.Equals(resolved, typed, StringComparison.OrdinalIgnoreCase))
-                    {
-                        hint.normal.textColor = new Color(0.7f, 0.85f, 1f);
-                        GUILayout.Label("      reads as " + resolved, hint);
-                    }
+                    hint.normal.textColor = row.HintColor;
+                    GUILayout.Label("      " + row.Hint, hint);
                 }
-
-                string res;
-                if (_azResult.TryGetValue(name, out res) && res != null)
+                if (row.Tuning != null)
                 {
-                    hint.normal.textColor = _azResultColor.ContainsKey(name) ? _azResultColor[name] : Color.white;
-                    GUILayout.Label("      " + res, hint);
+                    hint.normal.textColor = AzGrey;
+                    GUILayout.Label("      " + row.Tuning, hint);
                 }
-
-                if (play && !_azBusy && !_busyVoice) StartAzureCharacterTest(name);
-                if (pick)
+                if (row.Result != null)
                 {
-                    _azPick = _azPick == name ? null : name;
-                    _azPickScroll = Vector2.zero;
-                    if (_azPick != null && cat == null) StartAzureCatalogLoad();
+                    hint.normal.textColor = row.ResultColor;
+                    GUILayout.Label("      " + row.Result, hint);
                 }
-                if (pickerOpen) AzurePicker(name, bufKey, region);
+                if (row.Open) AzureBrowser(name, bufKey, region, cat, def, layout);
             }
 
             PlainNote("  A voice set here follows that character wherever she appears. Voices you choose "
-                + "are spoken at their natural pitch and pace; the original cast keeps the game's tuning "
-                + "unless you switch that off above.");
+                + "are spoken at their natural pitch and pace unless you set her own; the original cast "
+                + "keeps the game's tuning unless you switch that off above.");
         }
 
-        static void AzurePicker(string name, string bufKey, string region)
+        static string _azFrameRegion;
+        static List<AzureVoice> _azFrameCat;
+        static List<AzureTts.LocaleInfo> _azFrameLocs;
+
+        static void ToggleBrowser(string name)
         {
-            List<AzureVoice> cat = AzureTts.Catalog(region);
+            _azPick = _azPick == name ? null : name;
+            _azPickScroll = Vector2.zero;
+            _azLangOpen = false;
+            if (_azPick != null && AzureTts.Catalog(AzureRegionNow()) == null) StartAzureCatalogLoad();
+        }
+
+        // The list fetches itself when the Voice tab opens on Azure, so a typed
+        // name is checked straight away instead of after the first spoken line.
+        // Only for the SAVED key and region: a key or region still being typed
+        // would earn a failure per keystroke, and the region repair would then
+        // overwrite the box the player is typing in.
+        static readonly HashSet<string> _azAutoTried = new HashSet<string>();
+
+        static void AutoLoadCatalog(string region)
+        {
+            string key = AzureTts.EffectiveKey();
+            if (key.Length == 0) return;
+            string typedKey = Get("GameVoiceKey").Trim();
+            if (typedKey.Length > 0 && typedKey != key) return;
+            string savedRegion = Plugin.CfgGameVoiceRegion != null ? AzureTts.NormalizeRegion(Plugin.CfgGameVoiceRegion.Value) : "";
+            string typedRegion = AzureTts.NormalizeRegion(Get("GameVoiceRegion"));
+            if (typedRegion.Length > 0 && typedRegion != savedRegion) return;
+            if (AzureTts.CatalogBusy(region) || AzureTts.CatalogFailure(region) != 0) return;
+            if (!_azAutoTried.Add(region + "|" + key.GetHashCode())) return;
+            StartAzureCatalogLoad();
+        }
+
+        // The browser, rebuilt in 5.7. 5.6's filtered by whatever was in her
+        // voice box - so it showed only her own voice once she had one, and
+        // nothing when the box held a name the region lacks. It now has its own
+        // search, a language list, gender and HD filters, a preview button per
+        // voice, and her pitch and speed.
+        static List<AzureVoice> _azView = new List<AzureVoice>();
+        static string _azViewFor;
+        static List<AzureVoice> _azViewCat;
+        static string _azViewLine = "";
+        static string _azViewMine;
+
+        static void RefreshBrowse(string name, string region, List<AzureVoice> cat)
+        {
+            string saved = SavedAzureVoice(name);
+            string mine = null;
+            if (saved.Length > 0)
+            {
+                string problem;
+                mine = AzureTts.ResolveName(saved, region, out problem);
+            }
+            _azViewMine = mine;
+
+            string stamp = region + "\n" + _azSearch + "\n" + _azLang + "\n" + _azGender + "\n" + _azHdOnly;
+            if (stamp == _azViewFor && ReferenceEquals(cat, _azViewCat)) return;
+            _azViewFor = stamp;
+            _azViewCat = cat;
+
+            int total;
+            _azView = AzureTts.Browse(region, _azSearch, _azLang, _azGender, _azHdOnly, 150, out total);
+            if (total == 0)
+                _azViewLine = "Nothing in " + AzureTts.Where(region) + " matches these filters.";
+            else if (total > _azView.Count)
+                _azViewLine = "Showing " + _azView.Count + " of " + total + " voices in " + AzureTts.Where(region)
+                    + " (" + cat.Count + " in all) - search or filter to find the rest.";
+            else
+                _azViewLine = total + (total == 1 ? " voice" : " voices") + " in " + AzureTts.Where(region)
+                    + (total < cat.Count ? " match (" + cat.Count + " in all)." : ".");
+        }
+
+        static void AzureBrowser(string name, string bufKey, string region, List<AzureVoice> cat,
+            AzureVoiceSpec def, bool layout)
+        {
+            GUILayout.Space(4f);
+            if (layout) RefreshBrowse(name, region, cat);
+
+            // ---- her pitch and speed -------------------------------------------
+            // "Chosen" means a voice she will actually speak with. A saved name the
+            // region lacks leaves her on her original voice and its tuning, and
+            // the sliders' default has to say so.
+            bool chosen = _azViewMine != null;
+            bool gameTuning = !chosen && (Plugin.CfgAzureOriginalTuning == null || Plugin.CfgAzureOriginalTuning.Value);
+            int defPitch = gameTuning ? AzureTts.ParsePercent(def.PitchFormatted) : 0;
+            int defSpeed = gameTuning ? AzureTts.ParsePercent(def.RateFormatted) : 0;
+            TuningRow("Pitch", Voices.AzurePitchEntry(name), defPitch, Voices.PitchMin, Voices.PitchMax);
+            TuningRow("Speed", Voices.AzureSpeedEntry(name), defSpeed, Voices.SpeedMin, Voices.SpeedMax);
+            PlainNote("      Saved as you move them, and used for whichever voice she speaks with. "
+                + "\"default\" is " + (gameTuning ? "the original game's tuning for her voice"
+                    : "the voice's natural pitch and pace")
+                + ". Dragon HD voices take no pitch or speed changes.");
+
+            // ---- the voice list --------------------------------------------------
             if (cat == null)
             {
                 // Every branch draws one note and one button, so the control count
-                // is the same whatever state the list is in - IMGUI requires that
-                // between an event's layout pass and the event itself.
+                // is the same whatever state the list is in.
                 bool noKey = AzureKeyNow().Length == 0;
                 bool busy = !noKey && AzureTts.CatalogBusy(region);
                 long f = AzureTts.CatalogFailure(region);
                 string note;
                 if (noKey) note = "      No Azure key yet - paste it above first.";
-                else if (busy) note = "      Loading the voices region " + region + " offers...";
-                else if (f != 0) note = "      Could not load the voice list for region " + region + " ("
-                    + (f > 0 ? "HTTP " + f : "no connection") + "). Check the key and region - a wrong region "
-                    + "is found and fixed automatically when you load again.";
-                else note = "      The voice list for region " + region + " is not loaded yet.";
+                else if (busy) note = "      Loading the voices " + AzureTts.Where(region) + " offers...";
+                else if (f != 0) note = "      Could not load the voice list for " + AzureTts.Where(region) + " ("
+                    + (f > 0 ? "HTTP " + f + (f == 401 || f == 403 ? " - the key was refused" : "")
+                        : f == -2 ? "Azure's answer could not be read" : "no connection")
+                    + "). Check the key and region - a wrong region is found and fixed automatically "
+                    + "when you load again.";
+                else note = "      The voice list for " + AzureTts.Where(region) + " is not loaded yet.";
                 PlainNote(note);
 
                 bool was = GUI.enabled;
                 GUI.enabled = was && !noKey && !busy;
                 if (GUILayout.Button(busy ? "Loading..." : "Load the voice list for " + region, GUILayout.Width(340f)))
-                    StartAzureCatalogLoad();
+                    AzLater(StartAzureCatalogLoad);
                 GUI.enabled = was;
                 return;
             }
 
-            string filter = Get(bufKey).Trim();
-            List<AzureVoice> list = AzureTts.Suggest(region, filter, 60);
-            PlainNote("      " + cat.Count + " voices in " + region
-                + (filter.Length > 0 ? ", filtered by what is typed (clear the box to see them all)" : "")
-                + ". HD voices first. Click one to use it for " + Voices.LabelFor(name) + ".");
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(24f);
+            GUILayout.Label("Search", GUILayout.Width(62f));
+            _azSearch = TextFieldWithPlaceholder(_azSearch,
+                "name, language, mood or HD - e.g. ava, japanese, cheerful", 360f, true);
+            if (GUILayout.Button("Clear filters", GUILayout.Width(100f)))
+                AzLater(delegate
+                {
+                    _azSearch = "";
+                    _azLang = "";
+                    _azGender = 0;
+                    _azHdOnly = false;
+                    _azLangOpen = false;
+                });
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(24f);
+            GUILayout.Label("Language", GUILayout.Width(62f));
+            if (GUILayout.Button(LanguageLabel() + (_azLangOpen ? "   ▲" : "   ▼"), GUILayout.Width(270f)))
+                AzLater(delegate { _azLangOpen = !_azLangOpen; _azLangScroll = Vector2.zero; });
+            GUILayout.Space(12f);
+            int g = GUILayout.Toolbar(_azGender, GenderNames, GUILayout.Width(200f));
+            if (g != _azGender) AzLater(delegate { _azGender = g; });
+            GUILayout.Space(12f);
+            bool hd = GUILayout.Toggle(_azHdOnly, " HD only");
+            if (hd != _azHdOnly) AzLater(delegate { _azHdOnly = hd; });
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
             GUIStyle item = new GUIStyle(GUI.skin.button);
             item.alignment = TextAnchor.MiddleLeft;
             item.fontSize = 11;
 
-            _azPickScroll = GUILayout.BeginScrollView(_azPickScroll, GUILayout.Height(220f));
-            for (int i = 0; i < list.Count; i++)
+            if (_azLangOpen)
             {
-                AzureVoice v = list[i];
-                string label = v.ShortName + "     " + (v.LocalName ?? "") + " - " + (v.Gender ?? "")
-                    + (v.IsHD ? " - HD" : "")
-                    + (v.Styles != null && v.Styles.Length > 0 ? " - " + v.Styles.Length + " moods" : "");
-                if (GUILayout.Button(label, item, GUILayout.Height(22f)))
+                List<AzureTts.LocaleInfo> locs = _azFrameLocs;
+                _azLangScroll = GUILayout.BeginScrollView(_azLangScroll, GUILayout.Height(170f));
+                if (GUILayout.Button("All languages   (" + cat.Count + ")", item, GUILayout.Height(20f)))
+                    AzLater(delegate { _azLang = ""; _azLangOpen = false; });
+                for (int i = 0; locs != null && i < locs.Count; i++)
                 {
-                    _buf[bufKey] = v.ShortName;
-                    _azPick = null;
-                    Note(Voices.LabelFor(name) + ": " + v.ShortName + ". Press Save, or the play button to hear it.");
+                    AzureTts.LocaleInfo l = locs[i];
+                    if (GUILayout.Button(l.Name + "  -  " + l.Code + "   (" + l.Count + ")", item, GUILayout.Height(20f)))
+                        AzLater(delegate { _azLang = l.Code; _azLangOpen = false; });
                 }
+                GUILayout.EndScrollView();
+            }
+
+            PlainNote("      " + _azViewLine + " ▶ plays a sample as " + Voices.LabelFor(name)
+                + "; click a voice to give it to her (saved at once).");
+
+            GUIStyle mineStyle = new GUIStyle(item);
+            mineStyle.fontStyle = FontStyle.Bold;
+            mineStyle.normal.textColor = new Color(0.5f, 1f, 0.55f);
+
+            _azPickScroll = GUILayout.BeginScrollView(_azPickScroll, GUILayout.Height(260f));
+            for (int i = 0; i < _azView.Count; i++)
+            {
+                AzureVoice v = _azView[i];
+                bool mine = string.Equals(v.ShortName, _azViewMine, StringComparison.OrdinalIgnoreCase);
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(_azBusy || _busyVoice ? "..." : "▶", GUILayout.Width(30f), GUILayout.Height(22f))
+                    && !_azBusy && !_busyVoice)
+                    AzLater(delegate { StartAzureCharacterTest(name, v.ShortName); });
+                if (GUILayout.Button((mine ? "✓  " : "") + v.Label, mine ? mineStyle : item, GUILayout.Height(22f)))
+                    AzLater(delegate { ChooseAzureVoice(name, v.ShortName); });
+                GUILayout.EndHorizontal();
             }
             GUILayout.EndScrollView();
-            if (list.Count == 0) PlainNote("      Nothing in " + region + " matches \"" + filter + "\".");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(24f);
+            if (GUILayout.Button("Use her original voice (" + def.VoiceName + ")", GUILayout.Width(360f)))
+                AzLater(delegate { ChooseAzureVoice(name, ""); });
+            if (GUILayout.Button("Close", GUILayout.Width(90f)))
+                AzLater(delegate { _azPick = null; _azLangOpen = false; });
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.Space(6f);
+        }
+
+        static string LanguageLabel()
+        {
+            if (string.IsNullOrEmpty(_azLang)) return "All languages";
+            List<AzureTts.LocaleInfo> locs = _azFrameLocs;
+            for (int i = 0; locs != null && i < locs.Count; i++)
+                if (string.Equals(locs[i].Code, _azLang, StringComparison.OrdinalIgnoreCase))
+                    return locs[i].Name + "  -  " + locs[i].Code;
+            return _azLang;
+        }
+
+        // One slider, saved as it moves, in steps of 5. It shows the value she
+        // speaks at now: the default until it is touched, then hers.
+        static void TuningRow(string what, ConfigEntry<string> e, int def, int min, int max)
+        {
+            if (e == null) return;
+            int? set = Voices.ReadPct(e, min, max);
+            int cur = set.HasValue ? set.Value : def;
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(24f);
+            GUILayout.Label(what, GUILayout.Width(62f));
+            float raw = GUILayout.HorizontalSlider(cur, min, max, GUILayout.Width(250f));
+            GUILayout.Space(10f);
+            GUILayout.Label(AzureTts.Percent(cur) + (set.HasValue ? "" : "   (default)"), GUILayout.Width(130f));
+            bool minus = GUILayout.Button("-5", GUILayout.Width(36f));
+            bool plus = GUILayout.Button("+5", GUILayout.Width(36f));
+            bool reset = GUILayout.Button("Default", GUILayout.Width(70f));
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            int want = cur;
+            if (Mathf.Abs(raw - cur) > 0.01f) want = Mathf.Clamp(Mathf.RoundToInt(raw / 5f) * 5, min, max);
+            if (minus) want = Mathf.Clamp(cur - 5, min, max);
+            if (plus) want = Mathf.Clamp(cur + 5, min, max);
+
+            if (reset)
+            {
+                if (set.HasValue)
+                {
+                    Voices.SetAzureTuning(e, null);
+                    Plugin.SaveCfg();
+                }
+            }
+            else if (want != cur)
+            {
+                Voices.SetAzureTuning(e, want);
+                Plugin.SaveCfg();
+            }
+        }
+
+        static void ChooseAzureVoice(string name, string voice)
+        {
+            ConfigEntry<string> e = Voices.AzureEntry(name);
+            if (e == null) return;
+            e.Value = voice ?? "";
+            Plugin.SaveCfg();
+            _buf[AzVoicePrefix + name] = e.Value;
+            Note(e.Value.Length == 0
+                ? Voices.LabelFor(name) + " is back on her original voice. Saved."
+                : Voices.LabelFor(name) + " now speaks as " + e.Value + ". Saved - the play button lets you hear her.");
         }
 
         static void StartAzureCatalogLoad()
@@ -2499,25 +2851,28 @@ namespace AI2UCustomAI
             }
         }
 
-        static void StartAzureCharacterTest(string name)
+        // voice: a voice to preview from the browser, or null for the one she has.
+        // Either way the panel is saved first, so a key or region still in the
+        // boxes is the one that speaks.
+        static void StartAzureCharacterTest(string name, string voice)
         {
             MonoBehaviour host = HotkeyWatcher.Host;
             if (host == null) return;
             Commit();
-            host.StartCoroutine(AzureCharacterTest(name));
+            host.StartCoroutine(AzureCharacterTest(name, voice));
         }
 
-        static System.Collections.IEnumerator AzureCharacterTest(string name)
+        static System.Collections.IEnumerator AzureCharacterTest(string name, string voice)
         {
             _azBusy = true;
-            _azResult[name] = "speaking...";
+            _azResult[name] = voice != null ? "previewing " + voice + "..." : "speaking...";
             _azResultColor[name] = Color.white;
 
             string regionAtStart = Plugin.CfgGameVoiceRegion != null ? Plugin.CfgGameVoiceRegion.Value : null;
             AzureOutcome o = new AzureOutcome();
             AudioClip clip = null;
             System.Collections.IEnumerator e = GameTts.SynthesizeAzureCloud("Hey. This is how I will sound.",
-                delegate (AudioClip c) { clip = c; }, name, true, o);
+                delegate (AudioClip c) { clip = c; }, name, true, o, voice);
             bool threw = false;
             while (true)
             {
@@ -2548,7 +2903,7 @@ namespace AI2UCustomAI
 
                 if (o.Ok)
                 {
-                    _azResult[name] = "Azure: " + o.Voice + " in " + o.Region
+                    _azResult[name] = (voice != null ? "Preview: " : "Azure: ") + o.Voice + " in " + o.Region
                         + (o.Note != null ? ". " + o.Note : ".");
                     _azResultColor[name] = o.Note != null ? new Color(1f, 0.85f, 0.4f) : Color.green;
                 }
@@ -3468,14 +3823,19 @@ namespace AI2UCustomAI
         static void DefaultTag(string key)
         {
             string d = DefaultText(key);
-            if (d == null || IsDefault(key)) return;
+            if (d == null) return;
 
+            // Always one label, empty when the value is the default. The text
+            // reaches or leaves the default in the middle of a keystroke, and a
+            // label that came and went with it changed the row's control count
+            // between IMGUI's Layout pass and the key event.
+            bool show = !IsDefault(key);
             if (d.Length > 28) d = d.Substring(0, 27) + "…";
 
             GUIStyle s = new GUIStyle(GUI.skin.label);
             s.fontSize = 11;
             s.normal.textColor = new Color(0.58f, 0.62f, 0.68f);
-            GUILayout.Label("default: " + d, s, GUILayout.Width(150f));
+            GUILayout.Label(show ? "default: " + d : "", s, GUILayout.Width(150f));
         }
 
         // Same idea for a checkbox, where the default belongs in the sentence rather

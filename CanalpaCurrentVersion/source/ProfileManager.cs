@@ -115,6 +115,19 @@ namespace AI2UCustomAI
                         if (az != null) azObj[Voices.Names[i]] = az.Value ?? "";
                     }
                     root["azure_character_voices"] = azObj;
+
+                    // Her own Azure pitch and speed (5.7); "" is the default.
+                    JObject tuneObj = new JObject();
+                    for (int i = 0; i < Voices.Names.Length; i++)
+                    {
+                        JObject t = new JObject();
+                        var pe = Voices.AzurePitchEntry(Voices.Names[i]);
+                        var se = Voices.AzureSpeedEntry(Voices.Names[i]);
+                        t["pitch"] = pe != null ? (pe.Value ?? "") : "";
+                        t["speed"] = se != null ? (se.Value ?? "") : "";
+                        tuneObj[Voices.Names[i]] = t;
+                    }
+                    root["azure_character_tuning"] = tuneObj;
                 }
 
                 // Ints
@@ -178,6 +191,16 @@ namespace AI2UCustomAI
             {
                 if (Plugin.Log != null) Plugin.Log.LogError("Failed to save Profile " + profileNum + ": " + ex.Message);
             }
+        }
+
+        // A tuning value as text, whatever shape a hand-edited profile gives it;
+        // anything that is not a plain value is "default" rather than an error
+        // that would abandon the rest of the profile half-loaded.
+        static string TuningText(JObject t, string field)
+        {
+            JValue v = t != null ? t[field] as JValue : null;
+            if (v == null || v.Value == null) return "";
+            return Convert.ToString(v.Value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
         }
 
         public static void LoadProfile(int profileNum)
@@ -253,6 +276,22 @@ namespace AI2UCustomAI
                         string v = shared != null && shared[Voices.Names[i]] != null
                             ? ((string)shared[Voices.Names[i]] ?? "").Trim() : "";
                         az.Value = Voices.AzureCandidate(v) ? v : "";
+                    }
+                }
+
+                // A profile saved before 5.7 has no tuning. It never asked for
+                // any, so it gets the default - not whatever the previous profile
+                // happened to hold, which the next save would make its own.
+                if (Voices.Names != null)
+                {
+                    JObject tuneObj = root["azure_character_tuning"] as JObject;
+                    for (int i = 0; i < Voices.Names.Length; i++)
+                    {
+                        JObject t = tuneObj != null ? tuneObj[Voices.Names[i]] as JObject : null;
+                        var pe = Voices.AzurePitchEntry(Voices.Names[i]);
+                        var se = Voices.AzureSpeedEntry(Voices.Names[i]);
+                        if (pe != null) pe.Value = TuningText(t, "pitch");
+                        if (se != null) se.Value = TuningText(t, "speed");
                     }
                 }
 

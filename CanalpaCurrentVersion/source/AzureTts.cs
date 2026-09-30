@@ -52,8 +52,14 @@ namespace AI2UCustomAI
     internal sealed class AzureVoice
     {
         public string ShortName;
+        // DisplayName is the English name every voice has ("Nanami"); LocalName
+        // is the name in the voice's own language (七海), which for English
+        // voices is the same thing. Other apps list voices by DisplayName, so a
+        // name copied from one of them has to match it.
+        public string DisplayName;
         public string LocalName;
         public string Locale;
+        public string LocaleName;
         public string Gender;
         public string VoiceType;
         public string[] Styles;
@@ -64,7 +70,13 @@ namespace AI2UCustomAI
         // thousands of throwaway strings a frame.
         public string SqName;
         public string SqLocal;
+        public string SqDisplay;
         public string SqShort;
+        // Everything the browser's search box looks through, lower-cased, minus
+        // the gender, which is matched as a whole word ("male" is inside
+        // "female").
+        public string Hay;
+        public string Label;
 
         // HD voices are listed as VoiceType "NeuralHD" (the ...MultilingualNeuralHD
         // family) or carry "DragonHD" in the name. They are the most natural voices
@@ -74,7 +86,7 @@ namespace AI2UCustomAI
         {
             get
             {
-                return string.Equals(VoiceType, "NeuralHD", StringComparison.OrdinalIgnoreCase)
+                return (VoiceType != null && VoiceType.IndexOf("HD", StringComparison.OrdinalIgnoreCase) >= 0)
                     || (ShortName != null && ShortName.IndexOf("DragonHD", StringComparison.OrdinalIgnoreCase) >= 0);
             }
         }
@@ -132,6 +144,77 @@ namespace AI2UCustomAI
             return false;
         }
 
+        // Azure now hands out a per-resource endpoint - https://<your resource
+        // name>.cognitiveservices.azure.com/ - on the page where the key is, and
+        // its own quickstarts use it instead of a region. Until 5.7 the region box
+        // cut that address down to its first word and treated the resource name
+        // as a region, which does not exist; the request had nowhere to go. That
+        // address is now used as it is. It works for any key that belongs to it,
+        // whatever region the resource is in.
+        //
+        // The key is sent to whatever host this names, so it is accepted only in
+        // exactly that shape: one plain DNS label (letters, digits, hyphens) and
+        // then .cognitiveservices.azure.com. Anything else - a "?" or "#" or "@"
+        // that would make a URL mean some other server - is not a resource host.
+        const string ResourceSuffix = ".cognitiveservices.azure.com";
+
+        internal static bool IsResourceHost(string r)
+        {
+            if (string.IsNullOrEmpty(r) || !r.EndsWith(ResourceSuffix, StringComparison.OrdinalIgnoreCase)) return false;
+            string label = r.Substring(0, r.Length - ResourceSuffix.Length);
+            if (label.Length < 2 || label.Length > 63 || label[0] == '-' || label[label.Length - 1] == '-') return false;
+            for (int i = 0; i < label.Length; i++)
+            {
+                char c = label[i];
+                bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
+                if (!ok) return false;
+            }
+            return true;
+        }
+
+        // A place a request can legitimately go: a real region, or a resource's
+        // own address. Failures there that are not about the key (a timeout, a
+        // dropped connection) are passing trouble, not a sign the place is wrong.
+        internal static bool IsKnownTarget(string r)
+        {
+            return IsKnownRegion(r) || IsResourceHost(r);
+        }
+
+        // The base game's own Azure key, set through its settings page. The game
+        // keeps it in a static field that it fills only when that page is used,
+        // so after a restart the field is empty although the key is still saved;
+        // PlayerPrefs is where it survives.
+        internal static string GameMenuKey()
+        {
+            string k = "";
+            try { k = (Communicator.APIKey_UserPersonalTTS ?? "").Trim(); } catch (Exception) { }
+            if (k.Length == 0 && GameMenuKeyOn())
+            {
+                try { k = (PlayerPrefs.GetString("UserTTSAPIKey", "") ?? "").Trim(); } catch (Exception) { }
+            }
+            return k;
+        }
+
+        // The game leaves the key in PlayerPrefs after its voice setting is
+        // switched away from "personal key", so the saved key counts only while
+        // that switch is still on.
+        static bool GameMenuKeyOn()
+        {
+            try { return PlayerPrefs.GetInt("isUsingPersonalTTSAPIKey", 0) == 1; }
+            catch (Exception) { return false; }
+        }
+
+        internal static string GameMenuRegion()
+        {
+            string r = "";
+            try { r = (Communicator.APIKey_UserPersonalTTS_Region ?? "").Trim(); } catch (Exception) { }
+            if (r.Length == 0 && GameMenuKeyOn())
+            {
+                try { r = (PlayerPrefs.GetString("UserTTSAPIKey_Region", "") ?? "").Trim(); } catch (Exception) { }
+            }
+            return NormalizeRegion(r);
+        }
+
         // ---------------------------------------------------------------
         // Key and region input
         // ---------------------------------------------------------------
@@ -144,8 +227,7 @@ namespace AI2UCustomAI
         {
             string key = Plugin.CfgGameVoiceKey != null ? (Plugin.CfgGameVoiceKey.Value ?? "").Trim() : "";
             if (key.Length > 0) return key;
-            try { key = (Communicator.APIKey_UserPersonalTTS ?? "").Trim(); } catch (Exception) { key = ""; }
-            return key;
+            return GameMenuKey();
         }
 
         // The field asks for a region, and the Azure portal shows three different
@@ -165,6 +247,11 @@ namespace AI2UCustomAI
 
             int slash = s.IndexOf('/');
             if (slash >= 0) s = s.Substring(0, slash);
+            int colon = s.IndexOf(':');
+            if (colon >= 0) s = s.Substring(0, colon);
+
+            // A resource's own endpoint is kept whole - see IsResourceHost.
+            if (IsResourceHost(s)) return s.ToLowerInvariant();
 
             // A host like northcentralus.tts.speech.microsoft.com or
             // northcentralus.api.cognitive.microsoft.com carries the region as its
@@ -177,11 +264,13 @@ namespace AI2UCustomAI
 
         internal static string TtsUrl(string region)
         {
+            if (IsResourceHost(region)) return "https://" + region + "/tts/cognitiveservices/v1";
             return "https://" + region + ".tts.speech.microsoft.com/cognitiveservices/v1";
         }
 
         internal static string VoicesUrl(string region)
         {
+            if (IsResourceHost(region)) return "https://" + region + "/tts/cognitiveservices/voices/list";
             return "https://" + region + ".tts.speech.microsoft.com/cognitiveservices/voices/list";
         }
 
@@ -239,6 +328,9 @@ namespace AI2UCustomAI
                 case 429:
                     return "Azure's rate limit or monthly free quota is used up for this key.";
                 case 0:
+                    if (IsResourceHost(region))
+                        return "could not reach " + region + " (" + (error ?? "no connection") + "). Check the "
+                            + "endpoint address, or put the region code (like eastus) in the region box instead.";
                     return IsKnownRegion(region)
                         ? "could not reach Azure (" + (error ?? "no connection") + ")."
                         : "\"" + region + "\" is not an Azure region - use a code like northcentralus.";
@@ -264,12 +356,12 @@ namespace AI2UCustomAI
         internal static bool RegionLooksWrong(long catalogFailure, string region)
         {
             if (catalogFailure == 401 || catalogFailure == 403) return true;
-            return catalogFailure == -1 && !IsKnownRegion(region);
+            return catalogFailure == -1 && !IsKnownTarget(region);
         }
 
         internal static bool RejectsRegion(long httpCode, string region)
         {
-            return httpCode == 401 || httpCode == 403 || (httpCode == 0 && !IsKnownRegion(region));
+            return httpCode == 401 || httpCode == 403 || (httpCode == 0 && !IsKnownTarget(region));
         }
 
         // ---------------------------------------------------------------
@@ -423,8 +515,8 @@ namespace AI2UCustomAI
             float t;
             if (region == null || !_catalogBusy.TryGetValue(region, out t)) return false;
             // A load whose coroutine died never clears its own mark. The request
-            // times out at 10 s, so anything older than 20 s is a dead mark.
-            if (Time.realtimeSinceStartup - t > 20f)
+            // times out at 25 s, so anything older than 35 s is a dead mark.
+            if (Time.realtimeSinceStartup - t > 35f)
             {
                 _catalogBusy.Remove(region);
                 _catalogBusyKey.Remove(region);
@@ -433,8 +525,8 @@ namespace AI2UCustomAI
             return true;
         }
 
-        // The failure on record for a region was a rejection (401/403), but this
-        // key has since been SEEN to work there - a key that was still
+        // The failure on record for a region was a rejection (401/403) or a lost
+        // connection, but this key has since been SEEN to work there - a key that was still
         // activating, or a failure another key earned. Drop the stale rejection so
         // the voice list is fetched again; without it, per-girl voice names and
         // speaking styles stayed off for the whole session.
@@ -442,7 +534,7 @@ namespace AI2UCustomAI
         {
             long c;
             if (region == null || _catalog.ContainsKey(region)) return;
-            if (_catalogFailed.TryGetValue(region, out c) && (c == 401 || c == 403))
+            if (_catalogFailed.TryGetValue(region, out c) && (c == 401 || c == 403 || c == -1))
             {
                 _catalogFailed.Remove(region);
                 _catalogFailedAt.Remove(region);
@@ -462,7 +554,7 @@ namespace AI2UCustomAI
         {
             long c;
             if (region == null || !_catalogFailed.TryGetValue(region, out c)) return 0;
-            bool sticky = c == 401 || c == 403 || c == -2 || (c == -1 && !IsKnownRegion(region));
+            bool sticky = c == 401 || c == 403 || c == -2 || (c == -1 && !IsKnownTarget(region));
             float at;
             if (!sticky && _catalogFailedAt.TryGetValue(region, out at) && Time.realtimeSinceStartup - at > 60f)
             {
@@ -490,7 +582,7 @@ namespace AI2UCustomAI
             string busyKey;
             if (CatalogBusy(region) && _catalogBusyKey.TryGetValue(region, out busyKey) && busyKey == key)
             {
-                float until = Time.realtimeSinceStartup + 22f;
+                float until = Time.realtimeSinceStartup + 37f;
                 while (CatalogBusy(region) && Time.realtimeSinceStartup < until) yield return null;
                 if (_catalog.ContainsKey(region) || CatalogFailure(region) != 0 || CatalogBusy(region)) yield break;
             }
@@ -498,9 +590,12 @@ namespace AI2UCustomAI
             _catalogBusy[region] = Time.realtimeSinceStartup;
             _catalogBusyKey[region] = key;
 
+            // The list is half a megabyte (568 voices in northcentralus, more where
+            // the Dragon HD voices are). 10 s was not always enough for that on a
+            // slow line, and a timed-out list looked exactly like a broken browser.
             UnityWebRequest req = UnityWebRequest.Get(VoicesUrl(region));
             req.SetRequestHeader("Ocp-Apim-Subscription-Key", key);
-            req.timeout = 10;
+            req.timeout = 25;
             yield return req.SendWebRequest();
 
             long code = req.responseCode;
@@ -537,8 +632,10 @@ namespace AI2UCustomAI
                     if (o == null) continue;
                     AzureVoice v = new AzureVoice();
                     v.ShortName = (string)o["ShortName"];
+                    v.DisplayName = (string)o["DisplayName"];
                     v.LocalName = (string)o["LocalName"];
                     v.Locale = (string)o["Locale"];
+                    v.LocaleName = (string)o["LocaleName"];
                     v.Gender = (string)o["Gender"];
                     v.VoiceType = (string)o["VoiceType"];
                     JArray st = o["StyleList"] as JArray;
@@ -548,9 +645,12 @@ namespace AI2UCustomAI
                         for (int i = 0; i < st.Count; i++) v.Styles[i] = (string)st[i];
                     }
                     if (string.IsNullOrEmpty(v.ShortName)) continue;
+                    if (string.IsNullOrEmpty(v.DisplayName)) v.DisplayName = v.LocalName ?? NamePart(v.ShortName);
                     v.SqName = Squash(NamePart(v.ShortName));
                     v.SqLocal = Squash(v.LocalName);
+                    v.SqDisplay = Squash(v.DisplayName);
                     v.SqShort = Squash(v.ShortName);
+                    Describe(v);
                     list.Add(v);
                 }
             }
@@ -584,10 +684,16 @@ namespace AI2UCustomAI
         // threw away a plain "Jenny" and let through names the region does not
         // offer, which then failed the whole line. Now:
         //   - a name the catalogue lists is used exactly as listed;
-        //   - a voice's own display name is matched as typed, so a Japanese player
-        //     can type the 七海 the browser shows them;
+        //   - a voice's display name is matched as typed, in English ("Nanami")
+        //     or in its own script (七海), so a player can type what the browser
+        //     or any other voice app shows them;
         //   - a bare name ("Jenny", "JennyNeural", "nova hd") is matched against
         //     the catalogue, English first, so it means what the player meant;
+        //   - a line copied from another app's voice list - "Aria - en-US -
+        //     Female", "Aria (en-US)", Azure's own long "Microsoft Server Speech
+        //     Text to Speech Voice (en-US, AriaNeural)" - is read as the name it
+        //     carries, in the locale it carries. Until 5.7 those were refused,
+        //     which is how "typing a voice in does nothing" was reported;
         //   - anything else is rejected BEFORE it costs a line, with a reason, and
         //     the caller keeps her original voice instead.
         // With no catalogue (it could not be fetched), a full locale-prefixed name
@@ -596,62 +702,187 @@ namespace AI2UCustomAI
         {
             problem = null;
             if (raw == null) return null;
-            string want = raw.Trim();
+            string want = Unquote(raw.Trim());
             if (want.Length == 0) return null;
+
+            string fromLong = FromLongName(want);
+            if (fromLong != null) want = fromLong;
 
             List<AzureVoice> list = Catalog(region);
             if (list == null)
             {
                 if (LooksLikeShortName(want)) return want;
                 problem = "\"" + want + "\" is not a full Azure voice name (like en-US-JennyNeural), and "
-                    + "the voice list for region " + region + " could not be loaded to look it up.";
+                    + "the voice list for " + Where(region) + " could not be loaded to look it up.";
                 return null;
             }
 
-            AzureVoice exact = Find(region, want);
-            if (exact != null) return exact.ShortName;
+            AzureVoice hit = Match(list, want, null);
+            if (hit == null)
+            {
+                string locale;
+                string name = StripDecorations(want, out locale);
+                if (name.Length > 0 && (locale != null || name != want)) hit = Match(list, name, locale);
+            }
+            if (hit != null) return hit.ShortName;
+
+            problem = "\"" + want + "\" is not a voice " + Where(region) + " offers.";
+            if (want.IndexOf("dragon", StringComparison.OrdinalIgnoreCase) >= 0)
+                problem += " Dragon HD voices exist only in a few regions (eastus, westeurope and "
+                    + "southeastasia among them) - the list button shows what yours has.";
+            return null;
+        }
+
+        // "region eastus", or the resource address when that is what is in use.
+        internal static string Where(string region)
+        {
+            return IsResourceHost(region) ? region : "region " + region;
+        }
+
+        static AzureVoice Match(List<AzureVoice> list, string want, string locale)
+        {
+            // Everything past the exact matches compares letters and digits only.
+            // A name with none (七海 that was not a display name, "?", "-") must not
+            // reach those: an empty needle is a prefix of every voice, and used to
+            // pick whichever voice happened to be first in the list - an Amharic one.
+            string needle = Squash(want);
+            string needleN = needle + "neural";
 
             AzureVoice best = null;
             int bestScore = -1;
-
-            // Exact display name, compared as typed - the only match that works for
-            // names written in a non-Latin script.
             for (int i = 0; i < list.Count; i++)
             {
                 AzureVoice v = list[i];
-                if (!string.Equals(v.LocalName, want, StringComparison.OrdinalIgnoreCase)) continue;
-                int score = Pref(v);
-                if (score > bestScore) { best = v; bestScore = score; }
-            }
-            if (best != null) return best.ShortName;
-
-            // Everything below compares letters and digits only. A name with none
-            // (七海 that was not an exact display name, "?", "-") must be refused
-            // here: an empty needle is a prefix of every voice, and used to pick
-            // whichever voice happened to be first in the list - an Amharic one.
-            string needle = Squash(want);
-            if (needle.Length == 0)
-            {
-                problem = "\"" + want + "\" is not a voice region " + region + " offers.";
-                return null;
-            }
-            string needleN = needle + "neural";
-
-            for (int i = 0; i < list.Count; i++)
-            {
-                AzureVoice v = list[i];
+                if (locale != null && !LocaleFits(v.Locale, locale)) continue;
                 int score = -1;
-                if (v.SqName == needle || v.SqName == needleN) score = 100;
-                else if (v.SqLocal == needle) score = 90;
+                if (string.Equals(v.ShortName, want, StringComparison.OrdinalIgnoreCase)) score = 1000;
+                else if (string.Equals(v.DisplayName, want, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(v.LocalName, want, StringComparison.OrdinalIgnoreCase)) score = 500;
+                else if (needle.Length == 0) continue;
+                else if (v.SqName == needle || v.SqName == needleN) score = 100;
+                else if (v.SqShort == needle || v.SqShort == needleN) score = 95;
+                else if (v.SqDisplay == needle || v.SqLocal == needle) score = 90;
                 else if (v.SqName != null && v.SqName.StartsWith(needle, StringComparison.Ordinal)) score = 60;
+                else if (v.SqDisplay != null && v.SqDisplay.StartsWith(needle, StringComparison.Ordinal)) score = 50;
                 if (score < 0) continue;
                 score += Pref(v);
                 if (score > bestScore) { best = v; bestScore = score; }
             }
-            if (best != null) return best.ShortName;
+            if (best != null || needle.Length == 0) return best;
 
-            problem = "\"" + want + "\" is not a voice region " + region + " offers.";
-            return null;
+            // Last, the words one by one: "nova hd" is Nova Multilingual HD. The
+            // first word has to start the name and every word has to be in it;
+            // the shortest such name wins, so "nova" alone is not stretched onto
+            // a longer voice when a closer one exists.
+            string[] words = want.ToLowerInvariant().Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length < 2) return null;
+            int bestLen = int.MaxValue;
+            for (int i = 0; i < list.Count; i++)
+            {
+                AzureVoice v = list[i];
+                if (locale != null && !LocaleFits(v.Locale, locale)) continue;
+                string d = v.SqDisplay ?? "";
+                string first = Squash(words[0]);
+                if (first.Length == 0 || !(d.StartsWith(first, StringComparison.Ordinal)
+                    || (v.SqName != null && v.SqName.StartsWith(first, StringComparison.Ordinal)))) continue;
+                bool all = true;
+                for (int w = 1; w < words.Length && all; w++)
+                {
+                    string sq = Squash(words[w]);
+                    all = sq.Length == 0 || d.IndexOf(sq, StringComparison.Ordinal) >= 0
+                        || (v.SqName != null && v.SqName.IndexOf(sq, StringComparison.Ordinal) >= 0);
+                }
+                if (!all) continue;
+                int len = d.Length - Pref(v);
+                if (len < bestLen) { best = v; bestLen = len; }
+            }
+            return best;
+        }
+
+        // en-US fits en-US; a bare language ("en") fits every English locale.
+        static bool LocaleFits(string voiceLocale, string want)
+        {
+            if (string.IsNullOrEmpty(want)) return true;
+            if (string.IsNullOrEmpty(voiceLocale)) return false;
+            if (string.Equals(voiceLocale, want, StringComparison.OrdinalIgnoreCase)) return true;
+            return want.IndexOf('-') < 0
+                && voiceLocale.StartsWith(want + "-", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static string Unquote(string s)
+        {
+            if (s.Length >= 2)
+            {
+                char a = s[0], b = s[s.Length - 1];
+                if ((a == '"' && b == '"') || (a == '\'' && b == '\'') || (a == '“' && b == '”'))
+                    return s.Substring(1, s.Length - 2).Trim();
+            }
+            return s;
+        }
+
+        // "Microsoft Server Speech Text to Speech Voice (en-US, AriaNeural)" is the
+        // Name field of Azure's own voice list, and what some tools copy.
+        static string FromLongName(string s)
+        {
+            if (s.IndexOf("Speech Voice", StringComparison.OrdinalIgnoreCase) < 0) return null;
+            int a = s.IndexOf('('), b = s.LastIndexOf(')');
+            if (a < 0 || b < a) return null;
+            string[] p = s.Substring(a + 1, b - a - 1).Split(new[] { ',' });
+            if (p.Length != 2) return null;
+            string loc = p[0].Trim(), name = p[1].Trim();
+            if (loc.Length == 0 || name.Length == 0) return null;
+            return loc + "-" + name;
+        }
+
+        // Takes a line apart the way voice lists write them - "Aria - en-US -
+        // Female", "Aria (en-US)", "en-US Aria" - keeping the name and the locale
+        // and dropping the gender.
+        static string StripDecorations(string s, out string locale)
+        {
+            locale = null;
+            string[] parts = s.Split(new[] { " - ", "(", ")", ",", "|", "·", "/", "\t" },
+                StringSplitOptions.RemoveEmptyEntries);
+            List<string> keep = new List<string>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string[] words = parts[i].Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                List<string> kept = new List<string>();
+                for (int w = 0; w < words.Length; w++)
+                {
+                    string word = words[w];
+                    if (IsLocaleToken(word))
+                    {
+                        if (locale == null) locale = word;
+                        continue;
+                    }
+                    string lw = word.ToLowerInvariant();
+                    if (lw == "female" || lw == "male" || lw == "neutral" || lw == "-") continue;
+                    kept.Add(word);
+                }
+                if (kept.Count > 0) keep.Add(string.Join(" ", kept.ToArray()));
+            }
+            return string.Join(" ", keep.ToArray()).Trim();
+        }
+
+        // en-US, fil-PH, zh-HK, sr-Latn-RS: a language, then one or two short tags.
+        static bool IsLocaleToken(string w)
+        {
+            string[] p = w.Split(new[] { '-' });
+            if (p.Length < 2 || p.Length > 3) return false;
+            if (p[0].Length < 2 || p[0].Length > 3 || !Letters(p[0])) return false;
+            for (int i = 1; i < p.Length; i++)
+                if (p[i].Length < 2 || p[i].Length > 4 || !Letters(p[i])) return false;
+            return true;
+        }
+
+        static bool Letters(string s)
+        {
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) return false;
+            }
+            return s.Length > 0;
         }
 
         // Tie-break toward English, then American English.
@@ -665,7 +896,7 @@ namespace AI2UCustomAI
         internal static bool LooksLikeShortName(string s)
         {
             if (string.IsNullOrEmpty(s)) return false;
-            string[] parts = s.Split('-');
+            string[] parts = s.Split(new[] { '-' });
             if (parts.Length < 3) return false;
             if (parts[0].Length < 2 || parts[0].Length > 3) return false;
             if (parts[1].Length < 2 || parts[1].Length > 4) return false;
@@ -707,42 +938,179 @@ namespace AI2UCustomAI
             return b > 0 ? shortName.Substring(0, b) : "en-US";
         }
 
-        // Candidates for the picker, filtered by what is typed, HD voices first,
-        // then English, then everything else. A filter with no Latin letters in it
-        // is matched as typed, so a display name in any script still narrows it.
-        internal static List<AzureVoice> Suggest(string region, string filter, int max)
+        // ---------------------------------------------------------------
+        // The voice browser
+        // ---------------------------------------------------------------
+        //
+        // 5.6's browser filtered by whatever sat in the character's voice box. So
+        // it showed one voice - hers - as soon as she had one, and nothing at all
+        // when the box held a name the region lacks: to anyone opening it, it
+        // looked broken. The browser now has its own search and filters, and
+        // lists every voice as other voice apps do: "Ava Multilingual - en-US -
+        // Female".
+
+        // The line the browser shows, and everything its search looks through.
+        static void Describe(AzureVoice v)
         {
-            List<AzureVoice> list = Catalog(region);
+            StringBuilder sb = new StringBuilder();
+            sb.Append(v.DisplayName);
+            if (!string.IsNullOrEmpty(v.LocalName)
+                && !string.Equals(v.LocalName, v.DisplayName, StringComparison.OrdinalIgnoreCase))
+                sb.Append(" (").Append(v.LocalName).Append(')');
+            sb.Append(" - ").Append(v.Locale).Append(" - ").Append(v.Gender);
+            if (v.IsHD) sb.Append("   · HD");
+            if (v.Styles != null && v.Styles.Length > 0) sb.Append("   · ").Append(v.Styles.Length).Append(" moods");
+            v.Label = sb.ToString();
+
+            StringBuilder h = new StringBuilder();
+            h.Append(v.ShortName).Append(' ').Append(v.DisplayName).Append(' ').Append(v.LocalName)
+                .Append(' ').Append(v.Locale).Append(' ').Append(v.LocaleName);
+            if (v.IsHD) h.Append(" hd");
+            if (v.Styles != null)
+                for (int i = 0; i < v.Styles.Length; i++) h.Append(' ').Append(v.Styles[i]);
+            // Searched by word START ("ava" must not find Javanese through
+            // "jAVAnese"), so the punctuation between words becomes spaces and
+            // the whole thing is padded to make every word start with one.
+            string hay = h.ToString().ToLowerInvariant();
+            StringBuilder p = new StringBuilder(hay.Length + 2);
+            p.Append(' ');
+            for (int i = 0; i < hay.Length; i++)
+            {
+                char c = hay[i];
+                p.Append(c == '(' || c == ')' || c == ',' || c == '/' || c == ':' ? ' ' : c);
+            }
+            p.Append(' ');
+            v.Hay = p.ToString();
+        }
+
+        // gender: 0 any, 1 female, 2 male. locale: "" for every language. Every
+        // word typed must match something about the voice - its name, language
+        // ("japanese", "ja-JP"), a mood it has ("cheerful"), "hd" - and a gender
+        // word matches only the gender. total is how many matched in all; at
+        // most max come back, the most natural English voices first.
+        internal static List<AzureVoice> Browse(string region, string search, string locale, int gender,
+            bool hdOnly, int max, out int total)
+        {
+            total = 0;
             List<AzureVoice> outp = new List<AzureVoice>();
+            List<AzureVoice> list = Catalog(region);
             if (list == null) return outp;
-            string raw = (filter ?? "").Trim();
-            string f = Squash(raw);
+
+            string wantGender = gender == 1 ? "female" : gender == 2 ? "male" : null;
+            List<string> terms = new List<string>();
+            string[] words = (search ?? "").ToLowerInvariant().Split(new[] { ' ', ',', '\t' },
+                StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < words.Length; i++)
+            {
+                string w = words[i];
+                if (w == "-") continue;
+                if (w == "female" || w == "male" || w == "neutral") { wantGender = w; continue; }
+                terms.Add(w);
+            }
 
             List<AzureVoice> hd = new List<AzureVoice>(), us = new List<AzureVoice>(),
                 en = new List<AzureVoice>(), rest = new List<AzureVoice>();
             for (int i = 0; i < list.Count; i++)
             {
                 AzureVoice v = list[i];
-                if (f.Length > 0)
+                if (!string.IsNullOrEmpty(locale) && !LocaleFits(v.Locale, locale)) continue;
+                if (wantGender != null && !string.Equals(v.Gender, wantGender, StringComparison.OrdinalIgnoreCase)) continue;
+                if (hdOnly && !v.IsHD) continue;
+
+                bool ok = true;
+                for (int t = 0; t < terms.Count && ok; t++)
                 {
-                    if ((v.SqShort == null || v.SqShort.IndexOf(f, StringComparison.Ordinal) < 0)
-                        && (v.SqLocal == null || v.SqLocal.IndexOf(f, StringComparison.Ordinal) < 0)) continue;
+                    if (v.Hay != null && v.Hay.IndexOf(" " + terms[t], StringComparison.Ordinal) >= 0) continue;
+                    // "avamultilingual" for "Ava Multilingual", "en-us-ava" for a
+                    // short name typed without its tail.
+                    string sq = Squash(terms[t]);
+                    ok = sq.Length > 0
+                        && ((v.SqShort != null && v.SqShort.IndexOf(sq, StringComparison.Ordinal) >= 0)
+                            || (v.SqDisplay != null && v.SqDisplay.IndexOf(sq, StringComparison.Ordinal) >= 0));
                 }
-                else if (raw.Length > 0)
-                {
-                    if ((v.ShortName == null || v.ShortName.IndexOf(raw, StringComparison.OrdinalIgnoreCase) < 0)
-                        && (v.LocalName == null || v.LocalName.IndexOf(raw, StringComparison.OrdinalIgnoreCase) < 0)) continue;
-                }
+                if (!ok) continue;
+
+                total++;
                 bool english = v.Locale != null && v.Locale.StartsWith("en-", StringComparison.Ordinal);
                 if (v.IsHD && english) hd.Add(v);
                 else if (v.Locale == "en-US") us.Add(v);
                 else if (english) en.Add(v);
+                else if (v.IsHD) hd.Add(v);
                 else rest.Add(v);
             }
             List<AzureVoice>[] tiers = { hd, us, en, rest };
             for (int t = 0; t < tiers.Length && outp.Count < max; t++)
                 for (int i = 0; i < tiers[t].Count && outp.Count < max; i++) outp.Add(tiers[t][i]);
             return outp;
+        }
+
+        internal sealed class LocaleInfo
+        {
+            public string Code;
+            public string Name;
+            public int Count;
+        }
+
+        static List<AzureVoice> _localesFor;
+        static List<LocaleInfo> _locales;
+
+        // The languages a region's voices speak, for the browser's language list:
+        // American English first, the other Englishes next, then A to Z.
+        internal static List<LocaleInfo> Locales(string region)
+        {
+            List<AzureVoice> list = Catalog(region);
+            if (list == null) return null;
+            if (ReferenceEquals(list, _localesFor) && _locales != null) return _locales;
+
+            Dictionary<string, LocaleInfo> seen = new Dictionary<string, LocaleInfo>(StringComparer.OrdinalIgnoreCase);
+            List<LocaleInfo> outp = new List<LocaleInfo>();
+            for (int i = 0; i < list.Count; i++)
+            {
+                AzureVoice v = list[i];
+                if (string.IsNullOrEmpty(v.Locale)) continue;
+                LocaleInfo e;
+                if (!seen.TryGetValue(v.Locale, out e))
+                {
+                    e = new LocaleInfo();
+                    e.Code = v.Locale;
+                    e.Name = string.IsNullOrEmpty(v.LocaleName) ? v.Locale : v.LocaleName;
+                    seen[v.Locale] = e;
+                    outp.Add(e);
+                }
+                e.Count++;
+            }
+            outp.Sort(delegate (LocaleInfo a, LocaleInfo b)
+            {
+                int ra = LocaleRank(a.Code), rb = LocaleRank(b.Code);
+                if (ra != rb) return ra.CompareTo(rb);
+                return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            });
+            _localesFor = list;
+            _locales = outp;
+            return outp;
+        }
+
+        static int LocaleRank(string code)
+        {
+            if (code == "en-US") return 0;
+            if (code != null && code.StartsWith("en-", StringComparison.Ordinal)) return 1;
+            return 2;
+        }
+
+        // The SSML percentage for a whole-number offset: 10 -> "+10%".
+        internal static string Percent(int pct)
+        {
+            return pct >= 0 ? "+" + pct + "%" : pct + "%";
+        }
+
+        // "+10%" -> 10; anything unreadable -> 0.
+        internal static int ParsePercent(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            string t = s.Trim().TrimEnd(new[] { '%' }).TrimStart(new[] { '+' });
+            int v;
+            return int.TryParse(t, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out v) ? v : 0;
         }
 
         // ---------------------------------------------------------------

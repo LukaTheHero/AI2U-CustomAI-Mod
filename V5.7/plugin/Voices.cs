@@ -95,6 +95,16 @@ namespace AI2UCustomAI
                     + "(...MultilingualNeuralHD) sound the most natural.");
             }
 
+            for (int i = 0; i < Names.Length; i++)
+            {
+                _azPitch[Names[i]] = config.Bind("Voice.PerCharacterAzure", Names[i] + "Pitch", "",
+                    "Azure pitch for " + Labels[i] + ", in percent (-50 to 50). Empty = the default: the "
+                    + "original game's tuning for her original voice, natural pitch for a voice you chose.");
+                _azSpeed[Names[i]] = config.Bind("Voice.PerCharacterAzure", Names[i] + "Speed", "",
+                    "Azure speaking speed for " + Labels[i] + ", in percent (-50 to 100). Empty = the "
+                    + "default, as for pitch.");
+            }
+
             // Once, ever. Running it on every start put back any Azure voice the
             // player had deliberately cleared, because the old shared field still
             // held it and the Azure field was empty again.
@@ -154,6 +164,59 @@ namespace AI2UCustomAI
         {
             ConfigEntry<string> e;
             return name != null && _az.TryGetValue(name, out e) ? e : null;
+        }
+
+        // Per-character pitch and speed for Azure (5.7), asked for by a player
+        // who tunes every voice in his own app. Empty means "the default", which
+        // is not a number: her original voice keeps the game's own tuning, and a
+        // chosen voice speaks as it was built. A number replaces that default.
+        static readonly Dictionary<string, ConfigEntry<string>> _azPitch =
+            new Dictionary<string, ConfigEntry<string>>();
+        static readonly Dictionary<string, ConfigEntry<string>> _azSpeed =
+            new Dictionary<string, ConfigEntry<string>>();
+
+        internal const int PitchMin = -50, PitchMax = 50, SpeedMin = -50, SpeedMax = 100;
+
+        public static ConfigEntry<string> AzurePitchEntry(string name)
+        {
+            ConfigEntry<string> e;
+            return name != null && _azPitch.TryGetValue(name, out e) ? e : null;
+        }
+
+        public static ConfigEntry<string> AzureSpeedEntry(string name)
+        {
+            ConfigEntry<string> e;
+            return name != null && _azSpeed.TryGetValue(name, out e) ? e : null;
+        }
+
+        public static int? AzurePitchFor(string who)
+        {
+            return ReadPct(AzurePitchEntry(who), PitchMin, PitchMax);
+        }
+
+        public static int? AzureSpeedFor(string who)
+        {
+            return ReadPct(AzureSpeedEntry(who), SpeedMin, SpeedMax);
+        }
+
+        internal static int? ReadPct(ConfigEntry<string> e, int min, int max)
+        {
+            if (e == null || e.Value == null) return null;
+            string t = e.Value.Trim().TrimEnd(new[] { '%' }).TrimStart(new[] { '+' });
+            if (t.Length == 0) return null;
+            int v;
+            if (!int.TryParse(t, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out v)) return null;
+            return Math.Max(min, Math.Min(max, v));
+        }
+
+        // null puts her back on the default.
+        public static void SetAzureTuning(ConfigEntry<string> e, int? pct)
+        {
+            if (e == null) return;
+            string v = pct.HasValue
+                ? pct.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+            if (e.Value != v) e.Value = v;
         }
 
         // The Azure voice a player set for this character, or null for "her

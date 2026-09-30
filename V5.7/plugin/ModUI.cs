@@ -495,8 +495,12 @@ namespace AI2UCustomAI
 
                 if (outcome.Ok)
                 {
+                    // This test speaks as whoever is talking now - in a menu, nobody,
+                    // so the default voice. A player who had just set a girl's own
+                    // voice heard the default and took it that hers did nothing.
                     ReportVoice(report, "Works! Azure spoke it (" + outcome.Voice + ", " + outcome.Region + ")"
-                        + (outcome.Note != null ? ". " + outcome.Note : ""),
+                        + (outcome.Note != null ? ". " + outcome.Note : "")
+                        + ". To hear a character's own voice, use the play button next to her on the Voice tab (F9).",
                         outcome.Note != null ? new Color(1f, 0.85f, 0.4f) : Color.green);
                     Plugin.Log.LogInfo("Voice test succeeded: Azure " + outcome.Voice + " in " + outcome.Region + ".");
                 }

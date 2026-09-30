@@ -63,6 +63,10 @@ namespace AI2UCustomAI
         // checked against the region's catalogue once the region is known.
         public string Who;
         public string Custom;
+        // Her own pitch and speed from the Voice tab (5.7), in percent, or null
+        // for the default.
+        public int? UserPitch;
+        public int? UserSpeed;
     }
 
     // Handles both Local Overtone (offline) and Cloud Original (Azure) speech engines.
@@ -114,7 +118,7 @@ namespace AI2UCustomAI
         {
             try
             {
-                return !string.IsNullOrEmpty(Communicator.APIKey_UserPersonalTTS);
+                return AzureTts.GameMenuKey().Length > 0;
             }
             catch (Exception)
             {
@@ -263,6 +267,8 @@ namespace AI2UCustomAI
             AzureVoiceSpec spec = DefaultCast(who, summon, langIdx);
             spec.Who = who;
             spec.Custom = Voices.AzureVoiceFor(who);
+            spec.UserPitch = Voices.AzurePitchFor(who);
+            spec.UserSpeed = Voices.AzureSpeedFor(who);
             return spec;
         }
 
@@ -587,6 +593,17 @@ namespace AI2UCustomAI
         // reached. See AzureTts.cs for the three reports this traced back to.
         public static IEnumerator SynthesizeAzureCloud(string text, Action<AudioClip> done, string forceName, bool test, AzureOutcome o)
         {
+            IEnumerator e = SynthesizeAzureCloud(text, done, forceName, test, o, null);
+            while (e.MoveNext()) yield return e.Current;
+        }
+
+        // forceVoice: speak with this voice instead of the one saved for her - the
+        // voice browser's preview buttons, so a voice can be heard before it is
+        // chosen. Her pitch and speed still apply, so the preview is what she
+        // would sound like.
+        public static IEnumerator SynthesizeAzureCloud(string text, Action<AudioClip> done, string forceName, bool test,
+            AzureOutcome o, string forceVoice)
+        {
             if (o == null) o = new AzureOutcome();
             if (string.IsNullOrEmpty(text))
             {
@@ -598,10 +615,7 @@ namespace AI2UCustomAI
 
             string rawRegion = Plugin.CfgGameVoiceRegion != null ? (Plugin.CfgGameVoiceRegion.Value ?? "").Trim() : "";
             string region = AzureTts.NormalizeRegion(rawRegion);
-            if (region.Length == 0)
-            {
-                try { region = AzureTts.NormalizeRegion(Communicator.APIKey_UserPersonalTTS_Region); } catch (Exception) { }
-            }
+            if (region.Length == 0) region = AzureTts.GameMenuRegion();
             if (region.Length == 0) region = "eastus";
 
             // A region that had to be interpreted - a pasted endpoint URL, or
@@ -657,6 +671,7 @@ namespace AI2UCustomAI
             }
 
             AzureVoiceSpec spec = GetAzureVoiceSpec(Identity.CharacterId(), forceName);
+            if (!string.IsNullOrEmpty(forceVoice)) spec.Custom = forceVoice;
             string voice = spec.VoiceName, lang = spec.Language, pitch = spec.PitchFormatted, rate = spec.RateFormatted;
             bool custom = false;
 
@@ -683,19 +698,37 @@ namespace AI2UCustomAI
                 }
             }
 
+            bool userRate = ApplyTuning(spec, ref pitch, ref rate);
+
             bool expressive = !test && Plugin.CfgAzureExpressive != null && Plugin.CfgAzureExpressive.Value;
             string style = expressive ? AzureTts.StyleFor(AzureTts.Find(region, voice)) : null;
 
-            bool voiceTried = false;
-            for (int attempt = 0; attempt < 4; attempt++)
+            // Azure's Dragon HD voices take no pitch or speed changes (Microsoft's
+            // HD-voice docs). Leaving them out up front costs nothing; finding out
+            // by refusal would cost wasted requests on every line.
+            bool voiceTried = false, noProsody = IsDragonHd(voice);
+            long lastCode = 0;
+            string lastErr = null;
+            for (int attempt = 0; attempt < 8; attempt++)
             {
                 // A speaking style carries its own pacing - cheerful and frightened
                 // speech are about 15% faster on their own, measured - so it
                 // REPLACES the cast's speed boost instead of stacking on it. With
                 // both, Jane spoke at 1.5x her natural speed; with the style alone
-                // she keeps the game's pace (1.15x) and gains the emotion.
-                string sendRate = style != null ? "+0%" : rate;
-                string ssml = AzureTts.BuildSsml(lang, voice, pitch, sendRate, style, text);
+                // she keeps the game's pace (1.15x) and gains the emotion. A speed
+                // the player set by hand is theirs, and is sent as set.
+                //
+                // Her own speed is shown against the same default, so with a style
+                // it is sent relative to the boost the style replaced: moving the
+                // slider down 5 slows a styled line by 5, as it slows a plain one.
+                string sendRate = rate;
+                if (style != null)
+                    sendRate = userRate && spec.UserSpeed.HasValue
+                        ? AzureTts.Percent(spec.UserSpeed.Value - (custom ? 0 : AzureTts.ParsePercent(spec.RateFormatted)))
+                        : "+0%";
+                string ssml = noProsody
+                    ? AzureTts.BuildSsml(lang, voice, "+0%", "+0%", style, text)
+                    : AzureTts.BuildSsml(lang, voice, pitch, sendRate, style, text);
                 UnityWebRequest req = new UnityWebRequest(AzureTts.TtsUrl(region), "POST");
                 req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(ssml));
                 req.downloadHandler = new DownloadHandlerBuffer();
@@ -712,6 +745,8 @@ namespace AI2UCustomAI
 
                 long code = req.responseCode;
                 string err = req.error;
+                lastCode = code;
+                lastErr = err;
                 byte[] audio = null;
                 if (req.result == UnityWebRequest.Result.Success && req.downloadHandler != null
                     && req.downloadHandler.data != null && req.downloadHandler.data.Length > 1024)
@@ -758,28 +793,44 @@ namespace AI2UCustomAI
                     }
                 }
 
+                // A 400 is Azure refusing something in the request. Drop the
+                // extras first, the voice last: until 5.7 a refusal was blamed on
+                // her chosen voice straight away, so a mood or a pitch the voice
+                // could not take cost her the voice itself - in play only, since
+                // tests use no mood. That is one way "the voice I typed works on
+                // the play button but not in the game" could happen.
+                if (code == 400 && style != null)
+                {
+                    style = null;
+                    continue;
+                }
+
+                // Azure's Dragon HD voices take no pitch or speed changes.
+                if (code == 400 && !noProsody && HasProsody(pitch, rate))
+                {
+                    noProsody = true;
+                    if (spec.UserPitch.HasValue || spec.UserSpeed.HasValue)
+                        o.Note = Voices.LabelFor(spec.Who) + ": " + voice + " does not accept pitch or speed "
+                            + "changes, so hers were left out.";
+                    continue;
+                }
+
                 // Her chosen voice was refused: she keeps HER original voice for
                 // this line rather than losing Azure altogether.
                 if (code == 400 && custom && !voiceTried)
                 {
                     voiceTried = true;
-                    o.Note = Voices.LabelFor(spec.Who) + ": region " + region + " refused the voice \""
+                    o.Note = Voices.LabelFor(spec.Who) + ": " + AzureTts.Where(region) + " refused the voice \""
                         + voice + "\". Using her original voice (" + spec.VoiceName + ") instead.";
                     if (!test) AzureTts.Announce(o.Note);
                     voice = spec.VoiceName;
                     lang = spec.Language;
                     pitch = spec.PitchFormatted;
                     rate = spec.RateFormatted;
+                    userRate = ApplyTuning(spec, ref pitch, ref rate);
+                    noProsody = IsDragonHd(voice);
                     custom = false;
                     style = expressive ? AzureTts.StyleFor(AzureTts.Find(region, voice)) : null;
-                    continue;
-                }
-
-                // Defensive: Azure ignores unknown styles today, but if a style
-                // ever causes a refusal, the line matters more than the style.
-                if (code == 400 && style != null)
-                {
-                    style = null;
                     continue;
                 }
 
@@ -787,8 +838,32 @@ namespace AI2UCustomAI
                 break;
             }
 
+            // Every retry used up without an answer: still say what the last
+            // refusal was, or the failure would be silent again.
+            if (!o.Ok && o.Problem == null) o.Problem = AzureTts.Explain(lastCode, region, voice, lastErr);
+
             IEnumerator fb = FallBackToLocal(text, done, test, o);
             while (fb.MoveNext()) yield return fb.Current;
+        }
+
+        // Her own pitch and speed, when the player set them, replace the default
+        // for whichever voice she is using. Returns whether the speed is the
+        // player's.
+        static bool ApplyTuning(AzureVoiceSpec spec, ref string pitch, ref string rate)
+        {
+            if (spec.UserPitch.HasValue) pitch = AzureTts.Percent(spec.UserPitch.Value);
+            if (spec.UserSpeed.HasValue) rate = AzureTts.Percent(spec.UserSpeed.Value);
+            return spec.UserSpeed.HasValue;
+        }
+
+        static bool IsDragonHd(string voice)
+        {
+            return voice != null && voice.IndexOf("DragonHD", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        static bool HasProsody(string pitch, string rate)
+        {
+            return (pitch != null && pitch != "+0%") || (rate != null && rate != "+0%");
         }
 
         // Adopts the region a key turned out to belong to, saves it, and says so.

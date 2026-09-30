@@ -1,5 +1,60 @@
 # AI2U — Custom AI Endpoint
 
+## 5.7.0 — Azure voice browser, filters, pitch and speed
+
+Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64
+
+### NEW · A real voice browser
+
+Press **⋯** next to any character on the Voice tab (F9 → Voice, Cloud Original (Azure)).
+
+- **Search** by name, language, mood or "HD" — `ava`, `japanese`, `cheerful`, `en-GB female`.
+- **Language list**, a **Female / Male** filter and an **HD only** switch.
+- Voices are listed the way other voice apps list them: `Ava Multilingual - en-US - Female`.
+- **▶ next to every voice** plays a sample as that character, before you choose it.
+- Clicking a voice gives it to her and **saves at once**.
+
+### NEW · Pitch and speed per character
+
+Two sliders per character in the same panel. "Default" is the original game's
+tuning for her own voice, or the natural pitch and pace for a voice you chose.
+Dragon HD voices ignore pitch and speed; that's Azure, not the mod.
+
+### FIXED · Typing a voice in
+
+- Names copied from another app's voice list now work: `Aria - en-US - Female`,
+  `Aria (en-US)`, `en-US Aria`, `nova hd`.
+- A typed name now says **"Not saved yet"** until you press Save (or the play button).
+- The voice list loads when you open the Voice tab, so a typed name is checked right away.
+- The voice list waits longer before giving up on a slow connection.
+
+### FIXED · The voice list button
+
+- It showed only her current voice once she had one, and nothing at all when her
+  box held a name your region doesn't offer. It has its own search now.
+- Typing a voice name or searching the list could throw a Unity GUI error
+  ("Mismatched LayoutGroup") and skip part of the panel. Fixed.
+
+### FIXED · Easy installer picked the wrong copy of the game
+
+With more than one copy installed (Steam plus a copied or itch folder, or two
+Steam libraries), the mod could land in the copy you don't play. Now the
+installer lists every copy it finds — Steam, itch, or a folder on any drive —
+with whether BepInEx and the mod are already in it and when it last ran with
+mods. It picks the one that last ran with mods (or the Steam copy) and **waits for you to confirm
+the folder**: Enter installs there, a number picks another copy, **B** opens a
+folder browser, or paste a folder path.
+
+### FIXED · Azure setup
+
+- The endpoint address newer Azure resources show on their Keys and Endpoint page
+  (`https://<name>.cognitiveservices.azure.com/`) now works in the region box.
+- A key saved on the game's own settings page is still found after a restart.
+- If Azure refuses a mood or a pitch/speed for a voice you chose, only that part is
+  dropped. Before, she lost the chosen voice for that line.
+- Test voice now reminds you it plays the default voice in menus; the play button
+  next to each character plays hers.
+
 ## 5.6.0 — Azure voices actually reach Azure
 
 Built against game version 0.1.46 · Unity 2022.3.62 · Mono · Windows x64

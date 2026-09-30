@@ -7,7 +7,11 @@ HOW TO INSTALL (the easy way)
 2. Double-click Install.bat
 
 3. Follow the messages. It will:
-   - find your AI2U game folder (or ask you for it)
+   - find every copy of AI2U on your PC, show them all, and pick
+     the one that last ran with mods - then WAIT for you to
+     confirm that folder. Press Enter to install there, type
+     another copy's number, B to browse for a folder, or paste
+     a folder path. Play more than one copy? Run it once each.
    - download and set up BepInEx if you don't have it
    - install the mod
    - check that everything landed where it should
